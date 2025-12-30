@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Platform } from "../types";
 
@@ -17,7 +18,7 @@ const responseSchema: Schema = {
   properties: {
     title: {
       type: Type.STRING,
-      description: "A catchy title, required for Reddit, optional for X."
+      description: "A catchy title, required for Reddit, optional for X and Discord."
     },
     content: {
       type: Type.STRING,
@@ -65,8 +66,9 @@ export const generateDraftContent = async (
       - Brutalist, concise, technical but accessible.
       - Lowercase aesthetics preferred but use proper nouns.
       - Use 1-2 emojis max.
-      - For X: If it's long, format it as a thread separated by double newlines. Numbering happens automatically in UI, just provide text.
+      - For X: If it's long, format it as a thread separated by double newlines.
       - For Reddit: Provide a strong title and a markdown formatted body.
+      - For Discord: Use Discord-flavored markdown (code blocks, bolding). Keep it community-focused. Imagine it's for a #changelog or #dev-log channel.
     `;
 
     const response = await ai.models.generateContent({

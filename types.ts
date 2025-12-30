@@ -2,7 +2,8 @@
 export enum Platform {
   X = 'X',
   REDDIT = 'REDDIT',
-  EMAIL = 'EMAIL'
+  EMAIL = 'EMAIL',
+  DISCORD = 'DISCORD'
 }
 
 export interface Draft {
@@ -30,5 +31,6 @@ export interface UserConfig {
   xConnected: boolean;
   redditConnected: boolean;
   emailConnected: boolean;
+  discordConnected: boolean;
   setupComplete: boolean;
 }

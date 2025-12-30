@@ -115,23 +115,28 @@ const DraftsPanel: React.FC<DraftsPanelProps> = ({ activePlatform, setActivePlat
 
       {/* 2. MIDDLE: ACTION BAR */}
       <div className="h-16 flex items-center border-b border-df-border bg-df-black shrink-0">
-        <button className="h-full px-6 text-df-white text-xs font-bold hover:text-df-orange border-r border-df-border flex items-center gap-2 transition-colors">
+        <button className="h-full px-4 text-df-white text-xs font-bold hover:text-df-orange border-r border-df-border flex items-center gap-2 transition-colors">
           <Edit2 size={14} /> EDIT
         </button>
         
-        <div className="flex-grow flex items-center justify-center gap-4">
+        <div className="flex-grow flex items-center justify-center gap-4 px-2">
           <button 
             onClick={() => setActivePlatform(Platform.X)}
-            className={`text-xs font-bold transition-colors ${activePlatform === Platform.X ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
+            className={`text-[10px] font-bold transition-colors ${activePlatform === Platform.X ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
           >
             X
           </button>
-          <div className="h-4 w-[1px] bg-df-border"></div>
           <button 
              onClick={() => setActivePlatform(Platform.REDDIT)}
-             className={`text-xs font-bold transition-colors ${activePlatform === Platform.REDDIT ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
+             className={`text-[10px] font-bold transition-colors ${activePlatform === Platform.REDDIT ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
           >
             REDDIT
+          </button>
+          <button 
+             onClick={() => setActivePlatform(Platform.DISCORD)}
+             className={`text-[10px] font-bold transition-colors ${activePlatform === Platform.DISCORD ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
+          >
+            DISCORD
           </button>
         </div>
 

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ArrowRight, Check, Terminal, GitPullRequest, Users, Zap, Square, Mail, Code2 } from 'lucide-react';
+import { ArrowRight, Check, GitPullRequest, Users, Zap, Square, Mail, MessageSquare, MessageCircle, X as XIcon } from 'lucide-react';
 import { UserConfig } from '../types';
 
 interface OnboardingProps {
@@ -13,13 +13,16 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     xConnected: false,
     redditConnected: false,
     emailConnected: false,
+    discordConnected: false,
     setupComplete: false,
   });
 
   const handleConnect = (key: keyof UserConfig) => {
+    if (config[key]) return;
+    
     setTimeout(() => {
       setConfig((prev) => ({ ...prev, [key]: true }));
-    }, 600);
+    }, 400);
   };
 
   // --- STEP 1: TITLE SCREEN ---
@@ -78,7 +81,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
       <div className="flex border-t border-df-border">
           <button onClick={() => setStep(1)} className="w-1/3 py-6 text-df-gray hover:text-white border-r border-df-border text-xs font-bold uppercase">Back</button>
-          <button onClick={() => setStep(3)} className="flex-grow py-6 text-df-white hover:bg-[#111] text-xs font-bold uppercase flex items-center justify-center gap-2">Next <ArrowRight size={14}/></button>
+          <button onClick={() => setStep(3)} className="flex-grow py-6 bg-df-white text-black hover:bg-df-gray text-xs font-bold uppercase flex items-center justify-center gap-2">Next <ArrowRight size={14}/></button>
       </div>
     </div>
   );
@@ -119,13 +122,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     </div>
   );
 
-  // --- STEP 4: PROTOCOL SYNC (NEW) ---
+  // --- STEP 4: PROTOCOL SYNC ---
   const renderStep4 = () => (
     <div className="flex flex-col h-full animate-in slide-in-from-right duration-500 bg-[#050505]">
       <div className="p-6 pt-12 flex-grow flex flex-col justify-center">
         <div className="mb-2 text-df-orange font-bold text-xs uppercase tracking-widest">Protocol Sync</div>
-        <h2 className="text-3xl font-bold text-df-white mb-2 leading-tight uppercase">THE IDE CONNECTION.</h2>
-        <div className="text-sm font-bold text-df-orange mb-8 tracking-widest">MCP THOUGHT STREAM</div>
+        <h2 className="text-3xl font-bold text-df-white mb-8 leading-tight uppercase">THE IDE CONNECTION.</h2>
         
         <div className="bg-[#111] p-4 border border-df-border font-mono text-[10px] mb-8 relative">
            <div className="text-df-orange uppercase">$ mcp install brick --local-server</div>
@@ -146,81 +148,86 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   );
 
   // --- STEP 5: CONNECTIONS ---
-  const renderStep5 = () => (
-    <div className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-500">
-      <div className="p-4 border-b border-df-border flex justify-between items-center">
-         <span className="text-xs font-bold text-df-gray">STEP 05</span>
-         <span className="text-xs text-df-orange">CHANNELS</span>
-      </div>
+  const renderStep5 = () => {
+    const platforms = [
+      { id: 'xConnected' as keyof UserConfig, label: 'X', Icon: XIcon },
+      { id: 'redditConnected' as keyof UserConfig, label: 'REDDIT', Icon: MessageSquare },
+      { id: 'discordConnected' as keyof UserConfig, label: 'DISCORD', Icon: MessageCircle },
+      { id: 'emailConnected' as keyof UserConfig, label: 'EMAIL', Icon: Mail },
+    ];
 
-      <div className="flex-grow flex flex-col justify-center px-8 space-y-8">
-        <div>
-            <h2 className="text-2xl font-bold mb-2 uppercase">CONNECT ACCOUNTS</h2>
-            <p className="text-xs text-df-gray uppercase">Link your social profiles to enable drafting. This runs locally.</p>
+    const isAnyConnected = config.xConnected || config.redditConnected || config.emailConnected || config.discordConnected;
+
+    return (
+      <div className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-500 bg-[#050505]">
+        {/* We move the horizontal padding to the rows to allow flexible alignment control */}
+        <div className="flex-grow flex flex-col justify-center overflow-y-auto py-8">
+          <div className="mb-12 px-6">
+              <div className="mb-2 text-df-orange font-bold text-xs uppercase tracking-widest">Final Step</div>
+              <h2 className="text-3xl font-black mb-2 uppercase tracking-tighter text-df-white">CONNECT ACCOUNTS</h2>
+              <p className="text-[10px] text-df-gray uppercase tracking-widest font-bold">
+                ESTABLISH THE OUTBOUND CHANNELS.
+              </p>
+          </div>
+
+          <div className="flex flex-row flex-wrap justify-between px-6 w-full max-w-2xl">
+            {platforms.map(({ id, label, Icon }) => {
+              const isConnected = config[id];
+              return (
+                <button
+                  key={id}
+                  onClick={() => handleConnect(id)}
+                  className={`
+                    flex flex-col items-center gap-4 group transition-all duration-300
+                    ${isConnected ? 'text-df-orange' : 'text-df-gray hover:text-df-white'}
+                  `}
+                >
+                  <div className={`
+                    w-16 h-16 flex items-center justify-center border-2 shrink-0
+                    transition-all duration-300
+                    ${isConnected 
+                        ? 'border-df-orange bg-df-orange/10 shadow-[4px_4px_0px_rgba(255,98,0,0.2)]' 
+                        : 'border-[#222] bg-[#080808] group-hover:border-df-gray'}
+                  `}>
+                    <Icon 
+                      size={24} 
+                      className={`transition-colors duration-300 ${isConnected ? 'text-df-orange' : 'text-df-gray group-hover:text-df-white'}`} 
+                    />
+                  </div>
+                  
+                  <div className="flex flex-col items-center">
+                    <span className="font-black text-[10px] uppercase tracking-widest">{label}</span>
+                    <div className={`h-0.5 w-4 mt-1 transition-all duration-300 ${isConnected ? 'bg-df-orange opacity-100' : 'bg-transparent opacity-0'}`}></div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex flex-col gap-4">
-            <button
-            onClick={() => handleConnect('xConnected')}
-            disabled={config.xConnected}
-            className={`
-                w-full py-4 px-6 flex justify-between items-center border 
-                transition-all duration-200
-                ${config.xConnected 
-                ? 'bg-[#111] border-df-border text-df-gray cursor-default' 
-                : 'bg-transparent border-df-orange text-df-white hover:bg-df-orange/10'}
+        <div className="flex border-t border-df-border">
+          <button 
+            onClick={() => setStep(4)} 
+            className="w-1/3 py-6 text-df-gray hover:text-white border-r border-df-border text-xs font-bold uppercase"
+          >
+            Back
+          </button>
+          <button 
+            onClick={onComplete}
+            disabled={!isAnyConnected}
+            className={`flex-grow py-6 text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors
+              ${isAnyConnected ? 'bg-df-white text-black hover:bg-df-gray' : 'bg-[#111] text-df-gray cursor-not-allowed'}
             `}
-            >
-            <span className="font-bold flex items-center gap-2">X</span>
-            {config.xConnected ? <Check size={16} className="text-green-500" /> : <div className="w-2 h-2 bg-df-orange rounded-full"></div>}
-            </button>
-
-            <button
-            onClick={() => handleConnect('redditConnected')}
-            disabled={config.redditConnected}
-            className={`
-                w-full py-4 px-6 flex justify-between items-center border 
-                transition-all duration-200
-                ${config.redditConnected 
-                ? 'bg-[#111] border-df-border text-df-gray cursor-default' 
-                : 'bg-transparent border-df-orange text-df-white hover:bg-df-orange/10'}
-            `}
-            >
-            <span className="font-bold">REDDIT</span>
-            {config.redditConnected ? <Check size={16} className="text-green-500" /> : <div className="w-2 h-2 bg-df-orange rounded-full"></div>}
-            </button>
-
-            <button
-            onClick={() => handleConnect('emailConnected')}
-            disabled={config.emailConnected}
-            className={`
-                w-full py-4 px-6 flex justify-between items-center border 
-                transition-all duration-200
-                ${config.emailConnected 
-                ? 'bg-[#111] border-df-border text-df-gray cursor-default' 
-                : 'bg-transparent border-df-orange text-df-white hover:bg-df-orange/10'}
-            `}
-            >
-            <span className="font-bold flex items-center gap-2">EMAIL</span>
-            {config.emailConnected ? <Check size={16} className="text-green-500" /> : <div className="w-2 h-2 bg-df-orange rounded-full"></div>}
-            </button>
+          >
+            Enter Brick <ArrowRight size={14}/>
+          </button>
         </div>
       </div>
-
-      <button 
-         onClick={onComplete}
-         disabled={!config.xConnected && !config.redditConnected && !config.emailConnected}
-         className={`w-full py-4 font-bold flex items-center justify-center gap-2 transition-colors
-            ${(config.xConnected || config.redditConnected || config.emailConnected) ? 'bg-df-orange text-black hover:bg-white' : 'bg-[#111] text-df-gray cursor-not-allowed'}
-         `}
-       >
-         ENTER BRICK
-       </button>
-    </div>
-  );
+    );
+  };
 
   return (
-    <div className="h-full w-full bg-black text-df-white overflow-hidden relative border-r border-[#222]">
+    <div className="h-full w-full bg-black text-df-white overflow-hidden relative">
       {/* Step Indicator */}
       <div className="absolute top-0 left-0 h-1 bg-df-orange transition-all duration-500 ease-out z-50" style={{ width: `${(step / 5) * 100}%` }}></div>
       
