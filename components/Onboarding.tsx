@@ -7,6 +7,11 @@ interface OnboardingProps {
   onComplete: () => void;
 }
 
+// High-quality vector sources for brand logos
+const X_LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/5/53/X_logo_2023_original.svg";
+const REDDIT_LOGO_URL = "https://www.svgrepo.com/show/354256/reddit-icon.svg";
+const DISCORD_LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/8/89/Discord_Logo_sans_text.svg";
+
 const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const [step, setStep] = useState(1);
   const [config, setConfig] = useState<UserConfig>({
@@ -150,17 +155,16 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   // --- STEP 5: CONNECTIONS ---
   const renderStep5 = () => {
     const platforms = [
-      { id: 'xConnected' as keyof UserConfig, label: 'X', Icon: XIcon },
-      { id: 'redditConnected' as keyof UserConfig, label: 'REDDIT', Icon: MessageSquare },
-      { id: 'discordConnected' as keyof UserConfig, label: 'DISCORD', Icon: MessageCircle },
-      { id: 'emailConnected' as keyof UserConfig, label: 'EMAIL', Icon: Mail },
+      { id: 'xConnected' as keyof UserConfig, label: 'X', Icon: null, imageUrl: X_LOGO_URL },
+      { id: 'redditConnected' as keyof UserConfig, label: 'REDDIT', Icon: null, imageUrl: REDDIT_LOGO_URL },
+      { id: 'discordConnected' as keyof UserConfig, label: 'DISCORD', Icon: null, imageUrl: DISCORD_LOGO_URL },
+      { id: 'emailConnected' as keyof UserConfig, label: 'EMAIL', Icon: Mail, imageUrl: null },
     ];
 
     const isAnyConnected = config.xConnected || config.redditConnected || config.emailConnected || config.discordConnected;
 
     return (
       <div className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-500 bg-[#050505]">
-        {/* We move the horizontal padding to the rows to allow flexible alignment control */}
         <div className="flex-grow flex flex-col justify-center overflow-y-auto py-8">
           <div className="mb-12 px-6">
               <div className="mb-2 text-df-orange font-bold text-xs uppercase tracking-widest">Final Step</div>
@@ -171,7 +175,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           </div>
 
           <div className="flex flex-row flex-wrap justify-between px-6 w-full max-w-2xl">
-            {platforms.map(({ id, label, Icon }) => {
+            {platforms.map(({ id, label, Icon, imageUrl }) => {
               const isConnected = config[id];
               return (
                 <button
@@ -189,10 +193,26 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         ? 'border-df-orange bg-df-orange/10 shadow-[4px_4px_0px_rgba(255,98,0,0.2)]' 
                         : 'border-[#222] bg-[#080808] group-hover:border-df-gray'}
                   `}>
-                    <Icon 
-                      size={24} 
-                      className={`transition-colors duration-300 ${isConnected ? 'text-df-orange' : 'text-df-gray group-hover:text-df-white'}`} 
-                    />
+                    {imageUrl ? (
+                      <div 
+                        className={`w-10 h-10 transition-all duration-300 ${isConnected ? 'bg-df-orange' : 'bg-df-gray group-hover:bg-df-white'}`}
+                        style={{
+                          maskImage: `url(${imageUrl})`,
+                          maskRepeat: 'no-repeat',
+                          maskPosition: 'center',
+                          maskSize: 'contain',
+                          WebkitMaskImage: `url(${imageUrl})`,
+                          WebkitMaskRepeat: 'no-repeat',
+                          WebkitMaskPosition: 'center',
+                          WebkitMaskSize: 'contain',
+                        }}
+                      />
+                    ) : (
+                      Icon && <Icon 
+                        size={32} 
+                        className={`transition-colors duration-300 ${isConnected ? 'text-df-orange' : 'text-df-gray group-hover:text-df-white'}`} 
+                      />
+                    )}
                   </div>
                   
                   <div className="flex flex-col items-center">
