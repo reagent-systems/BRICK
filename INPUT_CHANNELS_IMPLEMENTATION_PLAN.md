@@ -81,18 +81,27 @@ Store code snippets for different coding agents:
 - Agent types: Cursor, Claude Code, Gemini CLI, Google Antigravity
 - Each returns formatted JSON/YAML config showing how to add BRICK's MCP server
 
-**Example format:**
+**Example format for Cursor:**
 ```json
 {
   "mcpServers": {
     "brick": {
-      "url": "ws://YOUR_IP:3000",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-brick"]
+      "url": "ws://YOUR_IP:3000"
     }
   }
 }
 ```
+
+**Note:** The config snippet should be formatted for each agent type:
+- **Cursor**: Add to `~/.cursor/mcp.json` or `<project-root>/.cursor/mcp.json`
+- **Claude Code**: Different config format/location
+- **Gemini CLI**: Different config format/location  
+- **Google Antigravity**: Different config format/location
+
+The snippet should include:
+- The WebSocket URL (with actual IP address from BRICK's MCP server)
+- Instructions on where to add the config file
+- Any agent-specific formatting requirements
 
 ### 3. Create Git Service with GitHub OAuth
 
