@@ -27,6 +27,11 @@ const DraftsPanel: React.FC<DraftsPanelProps> = ({ activePlatform, setActivePlat
   }, [triggerContext]);
 
   const handleGenerate = async (context: string) => {
+    if (activePlatform === Platform.ALL) {
+      // Don't generate when ALL is selected
+      return;
+    }
+    
     setIsGenerating(true);
     setCurrentDraft(null); // Clear previous draft visual immediately
     
@@ -80,9 +85,11 @@ const DraftsPanel: React.FC<DraftsPanelProps> = ({ activePlatform, setActivePlat
         {currentDraft && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
              {/* Platform Badge for context */}
-            <div className="mb-4 text-xs font-bold text-df-orange uppercase tracking-widest">
-                DRAFTING FOR {activePlatform}
-            </div>
+            {activePlatform !== Platform.ALL && (
+              <div className="mb-4 text-xs font-bold text-df-orange uppercase tracking-widest">
+                  DRAFTING FOR {activePlatform}
+              </div>
+            )}
 
             {activePlatform === Platform.REDDIT && currentDraft.title && (
               <div className="mb-4 font-bold text-lg text-df-white border-l-2 border-df-border pl-3">
@@ -114,30 +121,64 @@ const DraftsPanel: React.FC<DraftsPanelProps> = ({ activePlatform, setActivePlat
       </div>
 
       {/* 2. MIDDLE: ACTION BAR */}
-      <div className="h-16 flex items-center border-b border-df-border bg-df-black shrink-0">
+      <div className="h-20 lg:h-16 flex items-center border-b border-df-border bg-df-black shrink-0">
         <button className="h-full px-4 text-df-white text-xs font-bold hover:text-df-orange border-r border-df-border flex items-center gap-2 transition-colors">
           <Edit2 size={14} /> EDIT
         </button>
         
-        <div className="flex-grow flex items-center justify-center gap-4 px-2">
-          <button 
-            onClick={() => setActivePlatform(Platform.X)}
-            className={`text-[10px] font-bold transition-colors ${activePlatform === Platform.X ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
+        <div className="flex-grow flex items-center justify-center">
+          {/* Mobile Dropdown */}
+          <select
+            value={activePlatform}
+            onChange={(e) => setActivePlatform(e.target.value as Platform)}
+            className="lg:hidden w-full max-w-[200px] bg-df-black text-df-white text-xs font-bold px-3 py-3 focus:outline-none appearance-none cursor-pointer"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ff6b35' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 8px center',
+              paddingRight: '28px'
+            }}
           >
-            X
-          </button>
-          <button 
-             onClick={() => setActivePlatform(Platform.REDDIT)}
-             className={`text-[10px] font-bold transition-colors ${activePlatform === Platform.REDDIT ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
-          >
-            REDDIT
-          </button>
-          <button 
-             onClick={() => setActivePlatform(Platform.DISCORD)}
-             className={`text-[10px] font-bold transition-colors ${activePlatform === Platform.DISCORD ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
-          >
-            DISCORD
-          </button>
+            <option value={Platform.ALL} className="bg-df-black text-df-white">ALL</option>
+            <option value={Platform.X} className="bg-df-black text-df-white">X</option>
+            <option value={Platform.REDDIT} className="bg-df-black text-df-white">REDDIT</option>
+            <option value={Platform.DISCORD} className="bg-df-black text-df-white">DISCORD</option>
+            <option value={Platform.EMAIL} className="bg-df-black text-df-white">EMAIL</option>
+          </select>
+          
+          {/* Desktop Buttons */}
+          <div className="hidden lg:flex items-center justify-center gap-4">
+            <button 
+              onClick={() => setActivePlatform(Platform.ALL)}
+              className={`text-[10px] font-bold transition-colors ${activePlatform === Platform.ALL ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
+            >
+              ALL
+            </button>
+            <button 
+              onClick={() => setActivePlatform(Platform.X)}
+              className={`text-[10px] font-bold transition-colors ${activePlatform === Platform.X ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
+            >
+              X
+            </button>
+            <button 
+               onClick={() => setActivePlatform(Platform.REDDIT)}
+               className={`text-[10px] font-bold transition-colors ${activePlatform === Platform.REDDIT ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
+            >
+              REDDIT
+            </button>
+            <button 
+               onClick={() => setActivePlatform(Platform.DISCORD)}
+               className={`text-[10px] font-bold transition-colors ${activePlatform === Platform.DISCORD ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
+            >
+              DISCORD
+            </button>
+            <button 
+               onClick={() => setActivePlatform(Platform.EMAIL)}
+               className={`text-[10px] font-bold transition-colors ${activePlatform === Platform.EMAIL ? 'text-df-orange' : 'text-df-gray hover:text-white'}`}
+            >
+              EMAIL
+            </button>
+          </div>
         </div>
 
         <button 

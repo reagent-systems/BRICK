@@ -1,5 +1,6 @@
 
 export enum Platform {
+  ALL = 'ALL',
   X = 'X',
   REDDIT = 'REDDIT',
   EMAIL = 'EMAIL',

@@ -58,19 +58,18 @@ const App: React.FC = () => {
         return (
           <div className="flex flex-col h-full animate-in fade-in duration-200">
             {/* Mobile/Tablet Tabs - Hidden on Desktop */}
-            <div className="h-10 flex border-b border-df-border bg-df-black shrink-0 lg:hidden">
+            <div className={`flex border-b border-df-border bg-df-black shrink-0 lg:hidden ${isIdeConnected ? 'pt-[env(safe-area-inset-top,44px)] lg:pt-0 min-h-[48px]' : 'h-12'}`}>
               <button 
                 onClick={() => setActiveTab('drafts')}
-                className={`flex-1 text-xs font-bold tracking-wider hover:bg-[#111] transition-colors ${activeTab === 'drafts' ? 'text-df-white border-b-4 border-df-orange pt-1' : 'text-df-gray pt-1 border-b-4 border-transparent'}`}
+                className={`flex-1 text-xs font-bold tracking-wider hover:bg-[#111] transition-colors flex items-center justify-center ${activeTab === 'drafts' ? 'text-df-white border-b-4 border-df-orange py-2' : 'text-df-gray py-2 border-b-4 border-transparent'}`}
               >
                 DRAFTS
               </button>
               <button 
                 onClick={() => setActiveTab('feedback')}
-                className={`flex-1 text-xs font-bold tracking-wider hover:bg-[#111] transition-colors relative ${activeTab === 'feedback' ? 'text-df-white border-b-4 border-df-orange pt-1' : 'text-df-gray pt-1 border-b-4 border-transparent'}`}
+                className={`flex-1 text-xs font-bold tracking-wider hover:bg-[#111] transition-colors flex items-center justify-center ${activeTab === 'feedback' ? 'text-df-white border-b-4 border-df-orange py-2' : 'text-df-gray py-2 border-b-4 border-transparent'}`}
               >
                 FEEDBACK
-                <span className="absolute top-2 right-8 w-1.5 h-1.5 bg-df-orange rounded-full animate-pulse"></span>
               </button>
             </div>
 
