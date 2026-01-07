@@ -679,7 +679,26 @@ Unified service for handling OAuth flows for all platforms:
 - Token URL: `https://login.microsoftonline.com/common/oauth2/v2.0/token`
 - Send Email: `POST https://graph.microsoft.com/v1.0/me/sendMail`
 
-#### 6. Update Onboarding Component
+#### 6. Add "Follow us on X!" Step to Onboarding Flow
+
+**File**: `components/Onboarding.tsx`
+
+Add a new step in the onboarding flow (insert between current steps, e.g., as step 4.5 or before the connections step):
+
+**Step: "Follow us on X!"**
+- Display message: "Follow us on X!"
+- Include X/Twitter branding/icon
+- Add a "Follow" button/link that opens X profile in new tab/window
+- **Next button styling**: Make the "Next" button clickable but styled with a muted/gray color (`bg-[#111] text-df-gray`) to create the visual impression that following is required, even though it's not actually required to proceed
+- User can click "Next" without following, but the button color suggests they should follow first
+- After clicking "Next", proceed to the connections step (current step 5)
+
+**Implementation Notes:**
+- This is a social growth tactic - encourages following but doesn't block progress
+- Button should be visually distinct from the enabled state (white/orange) to create the desired psychological effect
+- Consider adding a subtle animation or visual cue when user clicks "Follow" to provide feedback
+
+#### 7. Update Onboarding Component
 
 **File**: `components/Onboarding.tsx`
 
@@ -706,7 +725,7 @@ const handleConnect = async (platform: Platform) => {
 - Show loading state during OAuth flow
 - Handle errors gracefully
 
-#### 7. Create OAuth Callback Handler
+#### 8. Create OAuth Callback Handler
 
 **File**: `components/OAuthCallback.tsx` or handle in `App.tsx`
 
@@ -718,7 +737,7 @@ Handle OAuth redirects:
 - Update connection status
 - Redirect back to onboarding or main app
 
-#### 8. Create Posting Service
+#### 9. Create Posting Service
 
 **File**: `services/postingService.ts`
 
