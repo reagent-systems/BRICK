@@ -17,6 +17,10 @@ const DraftsPanel: React.FC<DraftsPanelProps> = ({ activePlatform, setActivePlat
   const [isGenerating, setIsGenerating] = useState(false);
   const [history, setHistory] = useState<Draft[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const platforms = [Platform.ALL, Platform.X, Platform.REDDIT, Platform.DISCORD, Platform.EMAIL];
 
   // Effect to handle incoming "triggers" from the mock IDE
   useEffect(() => {
@@ -25,6 +29,82 @@ const DraftsPanel: React.FC<DraftsPanelProps> = ({ activePlatform, setActivePlat
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerContext]);
+
+  const itemHeight = 48;
+
+  // Effect to initialize carousel position
+  useEffect(() => {
+    if (carouselRef.current) {
+      const activeIndex = platforms.indexOf(activePlatform);
+      // Start in the middle section (second set of platforms)
+      const scrollPosition = platforms.length * itemHeight + (activeIndex * itemHeight);
+      carouselRef.current.scrollTop = scrollPosition;
+    }
+  }, []); // Only run once on mount
+
+  // Handle scroll to detect which platform is centered and handle infinite loop
+  const handleScroll = () => {
+    if (!carouselRef.current) return;
+    
+    const scrollTop = carouselRef.current.scrollTop;
+    const totalHeight = platforms.length * itemHeight;
+    
+    // Infinite scroll loop - seamless jumping
+    if (scrollTop < totalHeight * 0.5) {
+      // Near the top, jump to middle section
+      carouselRef.current.scrollTop = scrollTop + totalHeight;
+    } else if (scrollTop >= totalHeight * 2.5) {
+      // Near the bottom, jump to middle section
+      carouselRef.current.scrollTop = scrollTop - totalHeight;
+    }
+    
+    // Detect which platform is centered
+    const centerOffset = scrollTop % totalHeight;
+    const index = Math.round(centerOffset / itemHeight);
+    const normalizedIndex = index >= platforms.length ? index % platforms.length : index;
+    
+    if (platforms[normalizedIndex] && platforms[normalizedIndex] !== activePlatform) {
+      setActivePlatform(platforms[normalizedIndex]);
+    }
+    
+    // Clear existing timeout
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    
+    // Set timeout to snap when scrolling stops
+    scrollTimeoutRef.current = setTimeout(() => {
+      handleScrollEnd();
+    }, 150);
+  };
+
+  // Handle scroll end - snap to nearest item
+  const handleScrollEnd = () => {
+    if (!carouselRef.current) return;
+    
+    const scrollTop = carouselRef.current.scrollTop;
+    const totalHeight = platforms.length * itemHeight;
+    const centerOffset = scrollTop % totalHeight;
+    
+    // Find nearest item
+    const nearestIndex = Math.round(centerOffset / itemHeight);
+    const normalizedIndex = nearestIndex >= platforms.length ? nearestIndex % platforms.length : nearestIndex;
+    
+    // Calculate target scroll position (center the item)
+    const targetOffset = normalizedIndex * itemHeight;
+    const currentSection = Math.floor(scrollTop / totalHeight);
+    const targetScrollTop = currentSection * totalHeight + targetOffset;
+    
+    // Smooth scroll to center the item
+    carouselRef.current.scrollTo({
+      top: targetScrollTop,
+      behavior: 'smooth'
+    });
+    
+    if (platforms[normalizedIndex] && platforms[normalizedIndex] !== activePlatform) {
+      setActivePlatform(platforms[normalizedIndex]);
+    }
+  };
 
   const handleGenerate = async (context: string) => {
     if (activePlatform === Platform.ALL) {
@@ -127,24 +207,78 @@ const DraftsPanel: React.FC<DraftsPanelProps> = ({ activePlatform, setActivePlat
         </button>
         
         <div className="flex-grow flex items-center justify-center">
-          {/* Mobile Dropdown */}
-          <select
-            value={activePlatform}
-            onChange={(e) => setActivePlatform(e.target.value as Platform)}
-            className="lg:hidden w-full max-w-[200px] bg-df-black text-df-white text-xs font-bold px-3 py-3 focus:outline-none appearance-none cursor-pointer"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ff6b35' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 8px center',
-              paddingRight: '28px'
-            }}
-          >
-            <option value={Platform.ALL} className="bg-df-black text-df-white">ALL</option>
-            <option value={Platform.X} className="bg-df-black text-df-white">X</option>
-            <option value={Platform.REDDIT} className="bg-df-black text-df-white">REDDIT</option>
-            <option value={Platform.DISCORD} className="bg-df-black text-df-white">DISCORD</option>
-            <option value={Platform.EMAIL} className="bg-df-black text-df-white">EMAIL</option>
-          </select>
+          {/* Mobile Vertical Carousel Selector */}
+          <div className="lg:hidden relative w-full h-12 overflow-hidden">
+            {/* Orange downward arrow on the right */}
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 pointer-events-none">
+              <svg 
+                className="w-3 h-3 text-df-orange"
+                fill="none" 
+                viewBox="0 0 12 12"
+              >
+                <path fill="currentColor" d="M6 9L1 4h10z" />
+              </svg>
+            </div>
+            
+            {/* Mask gradients for fade effect */}
+            <div className="absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-df-black to-transparent z-10 pointer-events-none" />
+            <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-df-black to-transparent z-10 pointer-events-none" />
+            
+            {/* Infinite scrollable carousel */}
+            <div
+              ref={carouselRef}
+              className="h-full w-full overflow-y-scroll scrollbar-hide"
+              style={{
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+                WebkitOverflowScrolling: 'touch',
+                scrollBehavior: 'auto'
+              }}
+              onScroll={handleScroll}
+            >
+              {/* First set of platforms (for infinite scroll) */}
+              {platforms.map((platform, index) => (
+                <div
+                  key={`first-${platform}-${index}`}
+                  className="h-12 flex items-center justify-center"
+                >
+                  <span className="text-sm font-bold text-df-orange">
+                    {platform}
+                  </span>
+                </div>
+              ))}
+              
+              {/* Second set of platforms (for infinite scroll) */}
+              {platforms.map((platform, index) => (
+                <div
+                  key={`second-${platform}-${index}`}
+                  className="h-12 flex items-center justify-center"
+                >
+                  <span className="text-sm font-bold text-df-orange">
+                    {platform}
+                  </span>
+                </div>
+              ))}
+              
+              {/* Third set of platforms (for infinite scroll) */}
+              {platforms.map((platform, index) => (
+                <div
+                  key={`third-${platform}-${index}`}
+                  className="h-12 flex items-center justify-center"
+                >
+                  <span className="text-sm font-bold text-df-orange">
+                    {platform}
+                  </span>
+                </div>
+              ))}
+            </div>
+            
+            <style>{`
+              .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+              }
+            `}</style>
+          </div>
           
           {/* Desktop Buttons */}
           <div className="hidden lg:flex items-center justify-center gap-4">
