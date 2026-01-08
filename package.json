@@ -2,11 +2,15 @@
   "name": "brick",
   "private": true,
   "version": "0.0.0",
+  "main": "electron/main.js",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
+    "electron:build": "npm run build && electron-builder",
+    "electron:pack": "npm run build && electron-builder --dir",
     "cap:add": "cap add",
     "cap:sync": "cap sync",
     "cap:copy": "cap copy",
@@ -17,6 +21,9 @@
     "cap:android": "cap open android"
   },
   "dependencies": {
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/browser": "^8.0.0",
+    "@capacitor/preferences": "^8.0.0",
     "@google/genai": "^1.34.0",
     "lucide-react": "^0.562.0",
     "react": "^19.2.3",
@@ -29,7 +36,12 @@
     "@capacitor/ios": "^8.0.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^39.2.7",
+    "electron-builder": "^26.4.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "wait-on": "^9.0.3"
   }
 }

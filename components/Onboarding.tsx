@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight, GitPullRequest, Users, Zap, Square, Mail, MessageCircle } from 'lucide-react';
 import { UserConfig } from '../types';
+import { initiateOAuth, getConnectionStatus } from '../services/oauthService';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -23,13 +24,60 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     discordConnected: false,
     setupComplete: false,
   });
+  const [connecting, setConnecting] = useState<string | null>(null);
 
-  const handleConnect = (key: keyof UserConfig) => {
+  // Check connection status on mount and when step changes
+  useEffect(() => {
+    const checkConnections = async () => {
+      const [xConnected, redditConnected, discordConnected, emailConnected] = await Promise.all([
+        getConnectionStatus('x'),
+        getConnectionStatus('reddit'),
+        getConnectionStatus('discord'),
+        getConnectionStatus('email'),
+      ]);
+
+      setConfig((prev) => ({
+        ...prev,
+        xConnected,
+        redditConnected,
+        discordConnected,
+        emailConnected,
+      }));
+    };
+
+    if (step === 5) {
+      checkConnections();
+    }
+  }, [step]);
+
+  const handleConnect = async (key: keyof UserConfig) => {
     if (config[key]) return;
     
-    setTimeout(() => {
-      setConfig((prev) => ({ ...prev, [key]: true }));
-    }, 400);
+    setConnecting(key);
+
+    try {
+      // Map UserConfig keys to OAuth platform names
+      const platformMap: Record<string, 'x' | 'reddit' | 'discord' | 'email'> = {
+        xConnected: 'x',
+        redditConnected: 'reddit',
+        discordConnected: 'discord',
+        emailConnected: 'email',
+      };
+
+      const platform = platformMap[key];
+      if (!platform) {
+        throw new Error(`Unknown platform: ${key}`);
+      }
+
+      await initiateOAuth(platform);
+      // OAuth flow will redirect, callback handler will update state
+    } catch (error) {
+      console.error(`Failed to connect ${key}:`, error);
+      // Show error to user (you might want to add a toast/notification system)
+      alert(`Failed to connect: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setConnecting(null);
+    }
   };
 
   // --- STEP 1: TITLE SCREEN ---
@@ -179,13 +227,17 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           <div className="flex flex-row flex-wrap justify-between px-6 w-full max-w-2xl">
             {platforms.map(({ id, label, Icon, imagePath }) => {
               const isConnected = config[id];
+              const isConnecting = connecting === id;
               return (
                 <button
                   key={id}
                   onClick={() => handleConnect(id)}
+                  disabled={isConnecting || isConnected}
                   className={`
                     flex flex-col items-center gap-4 group transition-all duration-300
                     ${isConnected ? 'text-df-orange' : 'text-df-gray hover:text-df-white'}
+                    ${isConnecting ? 'opacity-50 cursor-wait' : ''}
+                    ${isConnected ? 'cursor-default' : 'cursor-pointer'}
                   `}
                 >
                   <div className={`

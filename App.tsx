@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Activity, Settings, ShieldCheck, Square } from 'lucide-react';
 import DraftsPanel from './components/DraftsPanel';
 import FeedbackPanel from './components/FeedbackPanel';
@@ -7,6 +7,7 @@ import SettingsPanel from './components/SettingsPanel';
 import Onboarding from './components/Onboarding';
 import InputChannelsSetup from './components/InputChannelsSetupModal';
 import { Platform } from './types';
+import { handleOAuthCallback } from './services/oauthService';
 
 export type ActivityTab = 'devflow' | 'settings';
 
@@ -24,6 +25,119 @@ const App: React.FC = () => {
   
   // State for Credits
   const [credits] = useState(85);
+
+  // Handle OAuth callbacks
+  useEffect(() => {
+    const handleOAuthRedirect = async () => {
+      // Check what environment we're in
+      const isElectron = (window as any).electronAPI !== undefined;
+      const isCapacitor = (window as any).Capacitor !== undefined;
+      
+      if (isElectron) {
+        // For Electron, listen to protocol handler callbacks
+        const electronAPI = (window as any).electronAPI;
+        electronAPI.onOAuthCallback(async (url: string) => {
+          await processOAuthCallback(url);
+        });
+        return () => {
+          electronAPI.removeOAuthCallback();
+        };
+      } else if (isCapacitor) {
+        // For Capacitor, listen to app URL events
+        const { App } = await import('@capacitor/app');
+        const listener = await App.addListener('appUrlOpen', async (data: { url: string }) => {
+          await processOAuthCallback(data.url);
+        });
+        return () => {
+          listener.remove();
+        };
+      } else {
+        // For web, check current URL
+        const url = window.location.href;
+        if (url.includes('/auth/') && url.includes('callback')) {
+          await processOAuthCallback(url);
+        }
+      }
+    };
+
+    handleOAuthRedirect();
+  }, []);
+
+  const processOAuthCallback = async (url: string) => {
+    try {
+      // Handle protocol URLs (brick://, com.brick.app://) and HTTP URLs
+      // Extract query parameters manually for protocol URLs
+      let code: string | null = null;
+      let state: string | null = null;
+      let error: string | null = null;
+      
+      if (url.startsWith('brick://') || url.startsWith('com.brick.app://')) {
+        // Protocol URL - parse manually
+        const urlParts = url.split('?');
+        if (urlParts.length > 1) {
+          const params = new URLSearchParams(urlParts[1]);
+          code = params.get('code');
+          state = params.get('state');
+          error = params.get('error');
+        }
+      } else {
+        // HTTP URL - use URL constructor
+        const urlObj = new URL(url);
+        code = urlObj.searchParams.get('code');
+        state = urlObj.searchParams.get('state');
+        error = urlObj.searchParams.get('error');
+      }
+
+      if (error) {
+        console.error('OAuth error:', error);
+        alert(`OAuth error: ${error}`);
+        return;
+      }
+
+      if (!code || !state) {
+        return; // Not an OAuth callback
+      }
+
+      // Determine platform from URL path
+      // Handle both HTTP URLs (web) and protocol URLs (Electron/Capacitor)
+      let platform: 'x' | 'reddit' | 'discord' | 'email' = 'x';
+      if (url.includes('/auth/twitter/') || url.includes('/auth/x/') || url.includes('twitter/callback')) {
+        platform = 'x';
+      } else if (url.includes('/auth/reddit/') || url.includes('reddit/callback')) {
+        platform = 'reddit';
+      } else if (url.includes('/auth/discord/') || url.includes('discord/callback')) {
+        platform = 'discord';
+      } else if (url.includes('/auth/email/') || url.includes('email/callback')) {
+        platform = 'email';
+      }
+
+      // Handle the callback
+      await handleOAuthCallback(platform, code, state);
+
+      // Close browser if in Capacitor (Electron handles this automatically)
+      const isCapacitor = (window as any).Capacitor !== undefined;
+      if (isCapacitor) {
+        try {
+          const { Browser } = await import('@capacitor/browser');
+          await Browser.close();
+        } catch (error) {
+          console.warn('Failed to close browser:', error);
+        }
+      }
+
+      // Clean up URL (for web)
+      if (!isCapacitor) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
+      // Refresh the page or update state to reflect new connection
+      // The Onboarding component will check connection status on mount/step change
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to process OAuth callback:', error);
+      alert(`Failed to complete OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
 
   const renderContent = () => {
     switch (activeActivity) {
