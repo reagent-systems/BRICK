@@ -9,6 +9,7 @@ import InputChannelsSetup from './components/InputChannelsSetupModal';
 import { Platform } from './types';
 import { handleOAuthCallback } from './services/oauthService';
 import { ConnectionProvider } from './contexts/ConnectionContext';
+import { isElectron, isNativePlatform } from './utils/platform';
 
 export type ActivityTab = 'devflow' | 'settings';
 
@@ -29,12 +30,11 @@ const App: React.FC = () => {
 
   // Handle OAuth callbacks - this runs FIRST before ConnectionContext checks
   useEffect(() => {
+    // Prevent double-processing in React StrictMode
+    const PROCESSING_KEY = 'oauth_callback_processing';
+
     const handleOAuthRedirect = async () => {
-      // Check what environment we're in
-      const isElectron = (window as any).electronAPI !== undefined;
-      const isCapacitor = (window as any).Capacitor !== undefined;
-      
-      if (isElectron) {
+      if (isElectron()) {
         // For Electron, listen to protocol handler callbacks
         const electronAPI = (window as any).electronAPI;
         electronAPI.onOAuthCallback(async (url: string) => {
@@ -43,8 +43,8 @@ const App: React.FC = () => {
         return () => {
           electronAPI.removeOAuthCallback();
         };
-      } else if (isCapacitor) {
-        // For Capacitor, listen to app URL events
+      } else if (isNativePlatform()) {
+        // For Capacitor Native (iOS/Android), listen to app URL events
         const { App } = await import('@capacitor/app');
         const listener = await App.addListener('appUrlOpen', async (data: { url: string }) => {
           await processOAuthCallback(data.url);
@@ -56,8 +56,22 @@ const App: React.FC = () => {
         // For web, check current URL IMMEDIATELY (before ConnectionContext checks)
         const url = window.location.href;
         if (url.includes('/auth/') && url.includes('callback')) {
-          // Process callback FIRST, then ConnectionContext will refresh
-          await processOAuthCallback(url);
+          // Prevent double-processing (React StrictMode calls effects twice)
+          if (sessionStorage.getItem(PROCESSING_KEY)) {
+            return;
+          }
+          sessionStorage.setItem(PROCESSING_KEY, 'true');
+
+          // Clean up URL immediately to prevent reprocessing on refresh
+          window.history.replaceState({}, document.title, '/');
+
+          try {
+            // Process callback FIRST, then ConnectionContext will refresh
+            await processOAuthCallback(url);
+          } finally {
+            // Clear processing flag after completion
+            sessionStorage.removeItem(PROCESSING_KEY);
+          }
         }
       }
     };
@@ -134,9 +148,8 @@ const App: React.FC = () => {
         alert(`Warning: ${platform.toUpperCase()} token may not have been saved. Check Settings to verify.`);
       }
 
-      // Close browser if in Capacitor (Electron handles this automatically)
-      const isCapacitor = (window as any).Capacitor !== undefined;
-      if (isCapacitor) {
+      // Close browser if in Capacitor NATIVE (Electron handles this automatically)
+      if (isNativePlatform()) {
         try {
           const { Browser } = await import('@capacitor/browser');
           await Browser.close();
@@ -145,24 +158,17 @@ const App: React.FC = () => {
         }
       }
 
-      // Clean up URL (for web) BEFORE dispatching event
-      const isElectron = (window as any).electronAPI !== undefined;
-      if (!isCapacitor && !isElectron) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
+      // URL cleanup is now done before processing in useEffect
 
       // Dispatch event to update global connection state (no reload needed!)
-      // Use a small delay to ensure token storage is fully complete
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('oauth-complete', { 
-          detail: { platform, connected: isNowConnected } 
-        }));
-        
-        // Show visual feedback
-        if (isNowConnected) {
-          alert(`${platform.toUpperCase()} account connected successfully!`);
-        }
-      }, 100);
+      window.dispatchEvent(new CustomEvent('oauth-complete', {
+        detail: { platform, connected: isNowConnected }
+      }));
+
+      // Show visual feedback (only once)
+      if (isNowConnected) {
+        alert(`${platform.toUpperCase()} account connected successfully!`);
+      }
     } catch (error) {
       console.error('Failed to process OAuth callback:', error);
       alert(`Failed to complete OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
