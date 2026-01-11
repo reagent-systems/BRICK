@@ -17,7 +17,7 @@ const EMAIL_LOGO_PATH = "/assets/email.png";
 
 
 const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
-  const { connections, hasAnyConnection, refreshConnections } = useConnections();
+  const { connections, hasAnyConnection } = useConnections();
   
   // Restore step from localStorage or determine from connection status
   const [step, setStep] = useState(() => {
@@ -48,19 +48,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       discordConnected: connections.discord,
     }));
   }, [connections]);
-
-  // Also listen for OAuth complete events to refresh immediately
-  useEffect(() => {
-    const handleOAuthComplete = async () => {
-      // Small delay to ensure token storage is complete
-      await new Promise(resolve => setTimeout(resolve, 200));
-      // Force refresh connections when OAuth completes
-      await refreshConnections();
-    };
-
-    window.addEventListener('oauth-complete', handleOAuthComplete);
-    return () => window.removeEventListener('oauth-complete', handleOAuthComplete);
-  }, [refreshConnections]);
 
   // Smart step detection: if any connected, jump to step 5
   useEffect(() => {

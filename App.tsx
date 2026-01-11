@@ -28,7 +28,7 @@ const App: React.FC = () => {
   // State for Credits
   const [credits] = useState(85);
 
-  // Handle OAuth callbacks - this runs FIRST before ConnectionContext checks
+  // Handle OAuth callbacks
   useEffect(() => {
     // Prevent double-processing in React StrictMode
     const PROCESSING_KEY = 'oauth_callback_processing';
@@ -53,7 +53,7 @@ const App: React.FC = () => {
           listener.remove();
         };
       } else {
-        // For web, check current URL IMMEDIATELY (before ConnectionContext checks)
+        // For web, check current URL
         const url = window.location.href;
         if (url.includes('/auth/') && url.includes('callback')) {
           // Prevent double-processing (React StrictMode calls effects twice)
@@ -66,19 +66,16 @@ const App: React.FC = () => {
           window.history.replaceState({}, document.title, '/');
 
           try {
-            // Process callback FIRST, then ConnectionContext will refresh
             await processOAuthCallback(url);
           } finally {
-            // Clear processing flag after completion
             sessionStorage.removeItem(PROCESSING_KEY);
           }
         }
       }
     };
 
-    // Run immediately, don't wait
     handleOAuthRedirect();
-  }, []); // Empty deps - only run once on mount
+  }, []);
 
   const processOAuthCallback = async (url: string) => {
     try {
@@ -128,23 +125,21 @@ const App: React.FC = () => {
         platform = 'email';
       }
 
-      // Handle the callback - this stores the token
+      // Handle the callback
       await handleOAuthCallback(platform, code, state);
 
       // Verify token was stored by checking immediately
       const { getConnectionStatus } = await import('./services/oauthService');
       let isNowConnected = await getConnectionStatus(platform);
-      
+
       // If not connected, wait a bit and retry (token storage might be async)
       if (!isNowConnected) {
         await new Promise(resolve => setTimeout(resolve, 300));
         isNowConnected = await getConnectionStatus(platform);
       }
-      
+
       // Show success/failure message
-      if (isNowConnected) {
-        // Success - the alert will show below
-      } else {
+      if (!isNowConnected) {
         alert(`Warning: ${platform.toUpperCase()} token may not have been saved. Check Settings to verify.`);
       }
 
@@ -158,14 +153,12 @@ const App: React.FC = () => {
         }
       }
 
-      // URL cleanup is now done before processing in useEffect
-
-      // Dispatch event to update global connection state (no reload needed!)
+      // Dispatch event to update global connection state
       window.dispatchEvent(new CustomEvent('oauth-complete', {
         detail: { platform, connected: isNowConnected }
       }));
 
-      // Show visual feedback (only once)
+      // Show visual feedback
       if (isNowConnected) {
         alert(`${platform.toUpperCase()} account connected successfully!`);
       }

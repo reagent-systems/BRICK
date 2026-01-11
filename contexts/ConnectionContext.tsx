@@ -50,27 +50,13 @@ export const ConnectionProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // Check connections on mount
   useEffect(() => {
-    const url = window.location.href;
-    const isCallback = url.includes('/auth/') && url.includes('callback');
-    
-    if (isCallback) {
-      // If this is a callback page, wait for callback processing first
-      // The App.tsx will process the callback, then we refresh
-      setTimeout(() => {
-        refreshConnections();
-      }, 800); // Longer delay to ensure callback processing completes
-    } else {
-      // Normal page load - check immediately
-      refreshConnections();
-    }
+    refreshConnections();
   }, []);
 
   // Listen for OAuth completion events
   useEffect(() => {
-    const handleOAuthComplete = async () => {
-      // Small delay to ensure token storage is complete
-      await new Promise(resolve => setTimeout(resolve, 200));
-      await refreshConnections();
+    const handleOAuthComplete = () => {
+      refreshConnections();
     };
 
     window.addEventListener('oauth-complete', handleOAuthComplete);
