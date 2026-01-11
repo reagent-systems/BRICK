@@ -1,9 +1,42 @@
 /**
  * Secure token storage service
- * Uses Capacitor Preferences for encrypted storage
+ * Uses Capacitor Preferences for native, localStorage for web
  */
 
 import { Preferences } from '@capacitor/preferences';
+import { isNativePlatform } from '../utils/platform';
+
+// Web-safe storage wrapper that uses localStorage directly on web
+const Storage = {
+  async set(options: { key: string; value: string }): Promise<void> {
+    if (isNativePlatform()) {
+      await Preferences.set(options);
+    } else {
+      localStorage.setItem(options.key, options.value);
+    }
+  },
+  async get(options: { key: string }): Promise<{ value: string | null }> {
+    if (isNativePlatform()) {
+      return await Preferences.get(options);
+    } else {
+      return { value: localStorage.getItem(options.key) };
+    }
+  },
+  async remove(options: { key: string }): Promise<void> {
+    if (isNativePlatform()) {
+      await Preferences.remove(options);
+    } else {
+      localStorage.removeItem(options.key);
+    }
+  },
+  async keys(): Promise<{ keys: string[] }> {
+    if (isNativePlatform()) {
+      return await Preferences.keys();
+    } else {
+      return { keys: Object.keys(localStorage) };
+    }
+  }
+};
 
 export interface OAuthTokens {
   accessToken: string;
@@ -21,7 +54,7 @@ const STATE_PREFIX = 'oauth_state_';
  */
 export async function storeTokens(platform: string, tokens: OAuthTokens): Promise<void> {
   const key = `${TOKEN_PREFIX}${platform}`;
-  await Preferences.set({
+  await Storage.set({
     key,
     value: JSON.stringify(tokens),
   });
@@ -32,7 +65,7 @@ export async function storeTokens(platform: string, tokens: OAuthTokens): Promis
  */
 export async function getTokens(platform: string): Promise<OAuthTokens | null> {
   const key = `${TOKEN_PREFIX}${platform}`;
-  const result = await Preferences.get({ key });
+  const result = await Storage.get({ key });
   
   if (!result.value) {
     return null;
@@ -71,8 +104,8 @@ export async function storeOAuthState(
   const key = `${STATE_PREFIX}${state}`;
   const expiry = Date.now() + 10 * 60 * 1000; // 10 minutes
   const value = JSON.stringify({ ...data, expiry });
-  
-  await Preferences.set({ key, value });
+
+  await Storage.set({ key, value });
 }
 
 /**
@@ -80,21 +113,21 @@ export async function storeOAuthState(
  */
 export async function getOAuthState(state: string): Promise<{ codeVerifier: string; platform: string } | null> {
   const key = `${STATE_PREFIX}${state}`;
-  const result = await Preferences.get({ key });
-  
+  const result = await Storage.get({ key });
+
   if (!result.value) {
     return null;
   }
-  
+
   try {
     const data = JSON.parse(result.value) as { codeVerifier: string; platform: string; expiry: number };
-    
+
     // Check if expired
     if (Date.now() > data.expiry) {
-      await Preferences.remove({ key });
+      await Storage.remove({ key });
       return null;
     }
-    
+
     return { codeVerifier: data.codeVerifier, platform: data.platform };
   } catch {
     return null;
@@ -106,7 +139,7 @@ export async function getOAuthState(state: string): Promise<{ codeVerifier: stri
  */
 export async function removeOAuthState(state: string): Promise<void> {
   const key = `${STATE_PREFIX}${state}`;
-  await Preferences.remove({ key });
+  await Storage.remove({ key });
 }
 
 /**
@@ -114,14 +147,14 @@ export async function removeOAuthState(state: string): Promise<void> {
  */
 export async function removeTokens(platform: string): Promise<void> {
   const key = `${TOKEN_PREFIX}${platform}`;
-  await Preferences.remove({ key });
+  await Storage.remove({ key });
 }
 
 /**
  * Get all connected platforms
  */
 export async function getConnectedPlatforms(): Promise<string[]> {
-  const keys = await Preferences.keys();
+  const keys = await Storage.keys();
   return keys.keys
     .filter(key => key.startsWith(TOKEN_PREFIX))
     .map(key => key.replace(TOKEN_PREFIX, ''));

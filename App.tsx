@@ -9,6 +9,7 @@ import InputChannelsSetup from './components/InputChannelsSetupModal';
 import { Platform } from './types';
 import { handleOAuthCallback } from './services/oauthService';
 import { ConnectionProvider } from './contexts/ConnectionContext';
+import { isElectron, isNativePlatform } from './utils/platform';
 
 export type ActivityTab = 'devflow' | 'settings';
 
@@ -29,12 +30,11 @@ const App: React.FC = () => {
 
   // Handle OAuth callbacks
   useEffect(() => {
+    // Prevent double-processing in React StrictMode
+    const PROCESSING_KEY = 'oauth_callback_processing';
+
     const handleOAuthRedirect = async () => {
-      // Check what environment we're in
-      const isElectron = (window as any).electronAPI !== undefined;
-      const isCapacitor = (window as any).Capacitor !== undefined;
-      
-      if (isElectron) {
+      if (isElectron()) {
         // For Electron, listen to protocol handler callbacks
         const electronAPI = (window as any).electronAPI;
         electronAPI.onOAuthCallback(async (url: string) => {
@@ -43,8 +43,8 @@ const App: React.FC = () => {
         return () => {
           electronAPI.removeOAuthCallback();
         };
-      } else if (isCapacitor) {
-        // For Capacitor, listen to app URL events
+      } else if (isNativePlatform()) {
+        // For Capacitor Native (iOS/Android), listen to app URL events
         const { App } = await import('@capacitor/app');
         const listener = await App.addListener('appUrlOpen', async (data: { url: string }) => {
           await processOAuthCallback(data.url);
@@ -56,7 +56,20 @@ const App: React.FC = () => {
         // For web, check current URL
         const url = window.location.href;
         if (url.includes('/auth/') && url.includes('callback')) {
-          await processOAuthCallback(url);
+          // Prevent double-processing (React StrictMode calls effects twice)
+          if (sessionStorage.getItem(PROCESSING_KEY)) {
+            return;
+          }
+          sessionStorage.setItem(PROCESSING_KEY, 'true');
+
+          // Clean up URL immediately to prevent reprocessing on refresh
+          window.history.replaceState({}, document.title, '/');
+
+          try {
+            await processOAuthCallback(url);
+          } finally {
+            sessionStorage.removeItem(PROCESSING_KEY);
+          }
         }
       }
     };
@@ -115,9 +128,23 @@ const App: React.FC = () => {
       // Handle the callback
       await handleOAuthCallback(platform, code, state);
 
-      // Close browser if in Capacitor (Electron handles this automatically)
-      const isCapacitor = (window as any).Capacitor !== undefined;
-      if (isCapacitor) {
+      // Verify token was stored by checking immediately
+      const { getConnectionStatus } = await import('./services/oauthService');
+      let isNowConnected = await getConnectionStatus(platform);
+
+      // If not connected, wait a bit and retry (token storage might be async)
+      if (!isNowConnected) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        isNowConnected = await getConnectionStatus(platform);
+      }
+
+      // Show success/failure message
+      if (!isNowConnected) {
+        alert(`Warning: ${platform.toUpperCase()} token may not have been saved. Check Settings to verify.`);
+      }
+
+      // Close browser if in Capacitor NATIVE (Electron handles this automatically)
+      if (isNativePlatform()) {
         try {
           const { Browser } = await import('@capacitor/browser');
           await Browser.close();
@@ -126,16 +153,15 @@ const App: React.FC = () => {
         }
       }
 
-      // Clean up URL (for web)
-      const isElectron = (window as any).electronAPI !== undefined;
-      if (!isCapacitor && !isElectron) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-
-      // Dispatch event to update global connection state (no reload needed!)
-      window.dispatchEvent(new CustomEvent('oauth-complete', { 
-        detail: { platform } 
+      // Dispatch event to update global connection state
+      window.dispatchEvent(new CustomEvent('oauth-complete', {
+        detail: { platform, connected: isNowConnected }
       }));
+
+      // Show visual feedback
+      if (isNowConnected) {
+        alert(`${platform.toUpperCase()} account connected successfully!`);
+      }
     } catch (error) {
       console.error('Failed to process OAuth callback:', error);
       alert(`Failed to complete OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);

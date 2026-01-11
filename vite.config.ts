@@ -8,6 +8,15 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        proxy: {
+          // Proxy Twitter API requests to avoid CORS issues in development
+          '/api/twitter': {
+            target: 'https://api.twitter.com',
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/api\/twitter/, ''),
+            secure: true,
+          },
+        },
       },
       plugins: [react()],
       define: {

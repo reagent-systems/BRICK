@@ -5,11 +5,16 @@
 
 import { generateCodeVerifier, generateCodeChallenge, generateState } from '../utils/pkce';
 import { storeOAuthState, getOAuthState, removeOAuthState, storeTokens, getTokens, OAuthTokens } from './tokenStorageService';
+import { isElectron, isNativePlatform } from '../utils/platform';
 
 // X/Twitter OAuth endpoints
 const TWITTER_AUTH_URL = 'https://twitter.com/i/oauth2/authorize';
-const TWITTER_TOKEN_URL = 'https://api.twitter.com/2/oauth2/token';
-const TWITTER_USER_URL = 'https://api.twitter.com/2/users/me';
+
+// API URLs - use proxy on web to avoid CORS, direct API on native
+const getApiUrl = (path: string): string => {
+  const baseUrl = isNativePlatform() ? 'https://api.twitter.com' : '/api/twitter';
+  return `${baseUrl}${path}`;
+};
 
 // Get OAuth credentials from environment or use defaults for development
 const getTwitterClientId = (): string => {
@@ -21,14 +26,13 @@ const getTwitterClientSecret = (): string => {
 };
 
 const getRedirectUri = (): string => {
-  // Check what environment we're in
-  const isElectron = (window as any).electronAPI !== undefined;
-  const isCapacitor = (window as any).Capacitor !== undefined || import.meta.env.VITE_CAPACITOR === 'true';
-  
-  if (isElectron) {
+  // Allow forcing Capacitor mode via env variable
+  const forceCapacitor = import.meta.env.VITE_CAPACITOR === 'true';
+
+  if (isElectron()) {
     // Electron uses custom protocol: brick://auth/twitter/callback
     return import.meta.env.VITE_TWITTER_REDIRECT_URI || 'brick://auth/twitter/callback';
-  } else if (isCapacitor) {
+  } else if (isNativePlatform() || forceCapacitor) {
     // Capacitor uses app bundle ID: com.brick.app://auth/twitter/callback
     return import.meta.env.VITE_TWITTER_REDIRECT_URI || 'com.brick.app://auth/twitter/callback';
   }
@@ -73,20 +77,16 @@ export async function initiateXOAuth(): Promise<void> {
 
   const authUrl = `${TWITTER_AUTH_URL}?${params.toString()}`;
 
-  // Open browser for OAuth flow
-  // Check what environment we're in
-  const isElectron = (window as any).electronAPI !== undefined;
-  const isCapacitor = (window as any).Capacitor !== undefined;
-  
-  if (isElectron) {
+  // Open browser for OAuth flow based on platform
+  if (isElectron()) {
     // Electron: Open in default browser (protocol handler will catch callback)
     window.open(authUrl, '_blank');
-  } else if (isCapacitor) {
-    // Capacitor: Use Browser plugin
+  } else if (isNativePlatform()) {
+    // Capacitor Native (iOS/Android): Use Browser plugin
     const { Browser } = await import('@capacitor/browser');
     await Browser.open({ url: authUrl });
   } else {
-    // Web: Redirect in same window
+    // Web: Redirect in same window (keeps React app context)
     window.location.href = authUrl;
   }
 }
@@ -98,6 +98,7 @@ export async function initiateXOAuth(): Promise<void> {
 export async function handleXOAuthCallback(code: string, state: string): Promise<OAuthTokens> {
   // Retrieve stored code verifier
   const stateData = await getOAuthState(state);
+
   if (!stateData || stateData.platform !== 'x') {
     throw new Error('Invalid or expired OAuth state');
   }
@@ -112,7 +113,7 @@ export async function handleXOAuthCallback(code: string, state: string): Promise
   }
 
   // Exchange authorization code for access token
-  const tokenResponse = await fetch(TWITTER_TOKEN_URL, {
+  const tokenResponse = await fetch(getApiUrl('/2/oauth2/token'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -170,7 +171,7 @@ export async function refreshXToken(): Promise<OAuthTokens> {
     throw new Error('Twitter OAuth credentials not configured');
   }
 
-  const response = await fetch(TWITTER_TOKEN_URL, {
+  const response = await fetch(getApiUrl('/2/oauth2/token'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -232,7 +233,7 @@ export async function ensureValidXToken(): Promise<string> {
 export async function getXUserProfile(): Promise<any> {
   const accessToken = await ensureValidXToken();
 
-  const response = await fetch(`${TWITTER_USER_URL}?user.fields=id,name,username,profile_image_url`, {
+  const response = await fetch(`${getApiUrl('/2/users/me')}?user.fields=id,name,username,profile_image_url`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
     },
@@ -256,7 +257,7 @@ export async function postTweet(text: string, mediaIds?: string[]): Promise<any>
     body.media = { media_ids: mediaIds };
   }
 
-  const response = await fetch('https://api.twitter.com/2/tweets', {
+  const response = await fetch(getApiUrl('/2/tweets'), {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
