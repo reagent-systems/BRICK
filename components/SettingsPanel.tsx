@@ -6,9 +6,10 @@ import { useConnections } from '../contexts/ConnectionContext';
 interface SettingsPanelProps {
   toneContext: string;
   setToneContext: (s: string) => void;
+  onNavigateToOnboarding?: () => void;
 }
 
-const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneContext }) => {
+const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneContext, onNavigateToOnboarding }) => {
   const { connections } = useConnections();
   const [analyzed, setAnalyzed] = useState(false);
   const [protocols, setProtocols] = useState({
@@ -130,9 +131,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneConte
 
         {/* OUTBOUND CHANNELS SECTION */}
         <section>
-          <h3 className="text-[10px] font-bold text-df-orange uppercase mb-4 flex items-center gap-2">
+          <button
+            onClick={onNavigateToOnboarding}
+            className="text-[10px] font-bold text-df-orange uppercase mb-4 flex items-center gap-2 hover:text-df-white transition-colors cursor-pointer"
+          >
             <Link size={12} /> OUTBOUND CHANNELS
-          </h3>
+          </button>
           <div className="space-y-3">
             <div className="bg-[#111] border border-df-border p-3 space-y-3">
               <div className="flex items-center justify-between">

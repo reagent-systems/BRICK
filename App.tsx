@@ -14,7 +14,11 @@ import { isElectron, isNativePlatform } from './utils/platform';
 export type ActivityTab = 'devflow' | 'settings';
 
 const App: React.FC = () => {
-  const [view, setView] = useState<'onboarding' | 'setup' | 'main'>('onboarding');
+  // Check if onboarding was completed previously
+  const [view, setView] = useState<'onboarding' | 'setup' | 'main'>(() => {
+    const onboardingComplete = localStorage.getItem('onboarding_complete') === 'true';
+    return onboardingComplete ? 'main' : 'onboarding';
+  });
   const [activeActivity, setActiveActivity] = useState<ActivityTab>('devflow');
   const [activeTab, setActiveTab] = useState<'drafts' | 'feedback'>('drafts');
   const [activePlatform, setActivePlatform] = useState<Platform>(Platform.X);
@@ -157,15 +161,17 @@ const App: React.FC = () => {
       window.dispatchEvent(new CustomEvent('oauth-complete', {
         detail: { platform, connected: isNowConnected }
       }));
-
-      // Show visual feedback
-      if (isNowConnected) {
-        alert(`${platform.toUpperCase()} account connected successfully!`);
-      }
     } catch (error) {
       console.error('Failed to process OAuth callback:', error);
       alert(`Failed to complete OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  };
+
+  const handleNavigateToOnboarding = () => {
+    localStorage.setItem('onboarding_step', '5');
+    // Set a flag to indicate this is manual navigation (don't auto-complete)
+    localStorage.setItem('manual_onboarding_navigation', 'true');
+    setView('onboarding');
   };
 
   const renderContent = () => {
@@ -174,7 +180,8 @@ const App: React.FC = () => {
         return (
           <SettingsPanel 
             toneContext={toneContext} 
-            setToneContext={setToneContext} 
+            setToneContext={setToneContext}
+            onNavigateToOnboarding={handleNavigateToOnboarding}
           />
         );
         
@@ -255,7 +262,10 @@ const App: React.FC = () => {
     <ConnectionProvider>
       {view === 'onboarding' ? (
         <div className="h-screen w-screen bg-black font-mono overflow-hidden">
-          <Onboarding onComplete={() => setView('main')} />
+          <Onboarding onComplete={() => {
+            localStorage.setItem('onboarding_complete', 'true');
+            setView('main');
+          }} />
         </div>
       ) : view === 'setup' ? (
         <InputChannelsSetup

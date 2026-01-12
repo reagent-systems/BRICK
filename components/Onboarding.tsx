@@ -1,9 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, GitPullRequest, Users, Zap, Square, Mail, MessageCircle } from 'lucide-react';
 import { UserConfig } from '../types';
 import { initiateOAuth } from '../services/oauthService';
 import { useConnections } from '../contexts/ConnectionContext';
+import { getXUserProfile } from '../services/xOAuthService';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -37,6 +38,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     setupComplete: false,
   });
   const [connecting, setConnecting] = useState<string | null>(null);
+  const [xUsername, setXUsername] = useState<string | null>(null);
+  const hasAutoJumped = useRef(false);
 
   // Sync local config when global connections change
   useEffect(() => {
@@ -49,13 +52,60 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     }));
   }, [connections]);
 
-  // Smart step detection: if any connected, jump to step 5
+  // Fetch X username when X is connected
   useEffect(() => {
+    if (connections.x && !xUsername) {
+      getXUserProfile()
+        .then((profile) => {
+          if (profile.data?.username) {
+            setXUsername(profile.data.username);
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to fetch X username:', error);
+        });
+    } else if (!connections.x) {
+      setXUsername(null);
+    }
+  }, [connections.x, xUsername]);
+
+  // Smart restoration: check if onboarding was completed or restore to saved step
+  useEffect(() => {
+    if (hasAutoJumped.current) return; // Already processed
+    
+    const isManualNavigation = localStorage.getItem('manual_onboarding_navigation') === 'true';
+    // Clear the manual navigation flag after checking
+    if (isManualNavigation) {
+      localStorage.removeItem('manual_onboarding_navigation');
+      // For manual navigation, just restore to saved step, don't auto-complete
+      const savedStep = localStorage.getItem('onboarding_step');
+      if (savedStep) {
+        const stepNum = parseInt(savedStep, 10);
+        if (stepNum >= 1 && stepNum <= 5) {
+          setStep(stepNum);
+        }
+      }
+      hasAutoJumped.current = true;
+      return;
+    }
+    
+    const onboardingComplete = localStorage.getItem('onboarding_complete') === 'true';
+    
+    // If onboarding was completed and user has connections, skip to main app
+    if (onboardingComplete && hasAnyConnection()) {
+      hasAutoJumped.current = true;
+      onComplete();
+      return;
+    }
+    
+    // If user has connections but hasn't completed onboarding, jump to step 5
     if (hasAnyConnection() && step < 5) {
+      hasAutoJumped.current = true;
       setStep(5);
       localStorage.setItem('onboarding_step', '5');
     }
-  }, [hasAnyConnection, step]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections]); // Run when connections change, but ref prevents multiple jumps
 
   // Save step to storage whenever it changes
   useEffect(() => {
@@ -246,6 +296,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             {platforms.map(({ id, label, Icon, imagePath }) => {
               const isConnected = config[id];
               const isConnecting = connecting === id;
+              // For X platform, show username if connected
+              const displayLabel = id === 'xConnected' && isConnected && xUsername 
+                ? `X: ${xUsername}` 
+                : label;
               return (
                 <button
                   key={id}
@@ -287,8 +341,31 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                     )}
                   </div>
                   
-                  <div className="flex flex-col items-center">
-                    <span className="font-black text-[10px] uppercase tracking-widest">{label}</span>
+                  <div className="flex flex-col items-center w-16">
+                    <div 
+                      className="font-black text-[10px] uppercase tracking-widest w-16 text-center overflow-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden relative"
+                      style={{
+                        maxWidth: '64px',
+                      }}
+                      title={displayLabel}
+                    >
+                      <span 
+                        className={`inline-block whitespace-nowrap ${
+                          id === 'xConnected' && isConnected && xUsername 
+                            ? 'animate-scroll-text' 
+                            : ''
+                        }`}
+                        style={
+                          id === 'xConnected' && isConnected && xUsername
+                            ? {
+                                animation: 'scroll-text 8s linear infinite',
+                              }
+                            : {}
+                        }
+                      >
+                        {displayLabel}
+                      </span>
+                    </div>
                     <div className={`h-0.5 w-4 mt-1 transition-all duration-300 ${isConnected ? 'bg-df-orange opacity-100' : 'bg-transparent opacity-0'}`}></div>
                   </div>
                 </button>
@@ -305,7 +382,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             Back
           </button>
           <button 
-            onClick={onComplete}
+            onClick={() => {
+              localStorage.setItem('onboarding_complete', 'true');
+              onComplete();
+            }}
             disabled={!isAnyConnected}
             className={`flex-grow py-6 text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors
               ${isAnyConnected ? 'bg-df-white text-black hover:bg-df-gray' : 'bg-[#111] text-df-gray cursor-not-allowed'}
@@ -320,6 +400,17 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
   return (
     <div className="h-full w-full bg-black text-df-white overflow-hidden relative">
+      {/* CSS Animation for scrolling text */}
+      <style>{`
+        @keyframes scroll-text {
+          0% {
+            transform: translateX(64px);
+          }
+          100% {
+            transform: translateX(calc(-100%));
+          }
+        }
+      `}</style>
       {/* Step Indicator */}
       <div className="absolute top-0 left-0 h-1 bg-df-orange transition-all duration-500 ease-out z-50" style={{ width: `${(step / 5) * 100}%` }}></div>
       
