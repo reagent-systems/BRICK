@@ -244,9 +244,8 @@ const App: React.FC = () => {
               {/* Right Column (Feedback) */}
               <div className={`flex-grow h-full lg:w-1/2 ${activeTab === 'feedback' ? 'block' : 'hidden lg:block'}`}>
                  {/* Desktop Header */}
-                 <div className="hidden lg:flex h-10 border-b border-df-border items-center px-4 bg-df-black shrink-0 relative">
+                 <div className="hidden lg:flex h-10 border-b border-df-border items-center px-4 bg-df-black shrink-0">
                     <span className="text-xs font-bold text-df-white tracking-wider">FEEDBACK</span>
-                    <span className="absolute top-3 right-4 w-1.5 h-1.5 bg-df-orange rounded-full animate-pulse"></span>
                  </div>
                  <div className="h-full lg:h-[calc(100%-40px)]">
                     <FeedbackPanel />

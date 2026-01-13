@@ -1,13 +1,78 @@
-import React, { useState } from 'react';
-import { RefreshCw, MessageSquare, ExternalLink } from 'lucide-react';
-import { MOCK_FEEDBACK } from '../constants';
+import React, { useState, useEffect } from 'react';
+import { RefreshCw, MessageSquare, ExternalLink, AlertCircle } from 'lucide-react';
 import { FeedbackItem } from '../types';
+import { fetchAllFeedback, FeedbackFetchOptions } from '../services/feedbackService';
+import { useConnections } from '../contexts/ConnectionContext';
 
 const FeedbackPanel: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'question' | 'bug' | 'request' | 'positive'>('all');
-  const [items, setItems] = useState<FeedbackItem[]>(MOCK_FEEDBACK);
+  const [items, setItems] = useState<FeedbackItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<number | null>(null);
+  const [lastRequestTime, setLastRequestTime] = useState<number>(0);
+  const { hasAnyConnection, connections } = useConnections();
 
-  const filteredItems = items.filter(item => filter === 'all' || item.type === filter);
+  // Fetch feedback on mount and when connections change
+  useEffect(() => {
+    if (hasAnyConnection()) {
+      loadFeedback();
+    } else {
+      setItems([]);
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections.x, connections.reddit, connections.discord, connections.email]);
+
+  const loadFeedback = async (options?: FeedbackFetchOptions) => {
+    if (!hasAnyConnection()) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+
+    // Prevent requests if we've made one in the last 15 minutes (rate limit protection)
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
+    const FIFTEEN_MINUTES = 15 * 60 * 1000; // 15 minutes in milliseconds
+    if (timeSinceLastRequest < FIFTEEN_MINUTES && lastRequestTime > 0) {
+      const minutesRemaining = Math.ceil((FIFTEEN_MINUTES - timeSinceLastRequest) / (60 * 1000));
+      setError(`Please wait ${minutesRemaining} minute${minutesRemaining !== 1 ? 's' : ''} before refreshing again to avoid rate limits.`);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      setLastRequestTime(now);
+      const feedback = await fetchAllFeedback(options);
+      setItems(feedback);
+      setLastFetchTime(now);
+    } catch (err) {
+      console.error('Failed to load feedback:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load feedback';
+      setError(errorMessage);
+      
+      // If it's a rate limit error, show a more helpful message
+      if (errorMessage.includes('Rate limit')) {
+        setError('X API rate limit exceeded. Please wait a few minutes before refreshing.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    // Prevent rapid refreshes
+    if (loading) return;
+    await loadFeedback({ since: lastFetchTime || undefined });
+  };
+
+  // When "all" is selected, show all items without filtering
+  const filteredItems = filter === 'all' 
+    ? items 
+    : items.filter(item => item.type === filter);
 
   // Group by thread
   const groupedItems: Record<string, FeedbackItem[]> = {};
@@ -34,14 +99,43 @@ const FeedbackPanel: React.FC = () => {
                 </button>
             ))}
          </div>
-         <button className="text-df-gray hover:text-df-orange transition-colors">
+         <button 
+            onClick={handleRefresh}
+            disabled={loading || !hasAnyConnection()}
+            className={`text-df-gray hover:text-df-orange transition-colors ${loading ? 'animate-spin' : ''} ${!hasAnyConnection() ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title="Refresh feedback"
+         >
             <RefreshCw size={14} />
          </button>
       </div>
 
       {/* FEED */}
       <div className="flex-grow overflow-y-auto p-4">
-        {Object.keys(groupedItems).length === 0 && (
+        {!hasAnyConnection() && (
+          <div className="text-center text-df-gray text-xs mt-10 flex flex-col items-center gap-2">
+            <AlertCircle size={16} className="text-df-orange" />
+            <div>Connect a platform in Settings to see feedback.</div>
+          </div>
+        )}
+        
+        {hasAnyConnection() && loading && items.length === 0 && (
+          <div className="text-center text-df-gray text-xs mt-10">Loading feedback...</div>
+        )}
+        
+        {hasAnyConnection() && error && (
+          <div className="text-center text-df-gray text-xs mt-10 flex flex-col items-center gap-2">
+            <AlertCircle size={16} className="text-red-500" />
+            <div>{error}</div>
+            <button 
+              onClick={() => loadFeedback()}
+              className="text-df-orange hover:text-df-white text-[10px] mt-2"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        
+        {hasAnyConnection() && !loading && Object.keys(groupedItems).length === 0 && (
             <div className="text-center text-df-gray text-xs mt-10">No feedback matching this filter.</div>
         )}
 
