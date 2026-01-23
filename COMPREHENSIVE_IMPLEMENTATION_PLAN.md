@@ -7,14 +7,16 @@ This document combines all implementation plans, setup guides, and documentation
 # Table of Contents
 
 1. [Input & Output Channels Implementation Plan](#input--output-channels-implementation-plan)
-2. [OAuth Setup Guide](#oauth-setup-guide)
-3. [OAuth Implementation Fix Guide](#oauth-implementation-fix-guide)
-4. [Native App OAuth Setup](#native-app-oauth-setup)
-5. [Electron Desktop App Setup](#electron-desktop-app-setup)
-6. [Simulated Endpoints & Mock Data Analysis](#simulated-endpoints--mock-data-analysis)
-7. [Simulation Documentation](#simulation-documentation)
-8. [README](#readme)
-9. [Human Todo List](#human-todo-list)
+2. [Global Channel Components Setup](#global-channel-components-setup)
+3. [OAuth Setup Guide](#oauth-setup-guide)
+4. [OAuth Implementation Fix Guide](#oauth-implementation-fix-guide)
+5. [Native App OAuth Setup](#native-app-oauth-setup)
+6. [Electron Desktop App Setup](#electron-desktop-app-setup)
+7. [App Store & Play Store Distribution](#app-store--play-store-distribution)
+8. [Simulated Endpoints & Mock Data Analysis](#simulated-endpoints--mock-data-analysis)
+9. [Simulation Documentation](#simulation-documentation)
+10. [README](#readme)
+11. [Human Todo List](#human-todo-list)
 
 ---
 
@@ -1543,6 +1545,861 @@ npm install electron-updater
 
 ---
 
+# App Store & Play Store Distribution
+
+This section covers all prerequisites, setup steps, and submission processes for distributing BRICK on the Apple App Store and Google Play Store.
+
+---
+
+## Prerequisites Overview
+
+### Required Accounts & Subscriptions
+
+**Apple App Store:**
+- Apple Developer Account ($99/year)
+- Apple ID with 2FA enabled
+- Mac computer (required for building iOS apps)
+- Xcode (latest version from Mac App Store)
+
+**Google Play Store:**
+- Google Play Console Account ($25 one-time fee)
+- Google Account
+- Can build on Windows, macOS, or Linux
+
+---
+
+## Part 1: Apple App Store Distribution
+
+### Prerequisites
+
+#### 1.1 Apple Developer Account Setup
+
+1. **Enroll in Apple Developer Program**
+   - Go to https://developer.apple.com/programs/
+   - Click "Enroll"
+   - Sign in with your Apple ID
+   - Complete enrollment (requires credit card, $99/year)
+   - Wait for approval (usually 24-48 hours)
+
+2. **Verify Account Status**
+   - Go to https://developer.apple.com/account
+   - Ensure account is "Active"
+   - Check that you have access to:
+     - Certificates, Identifiers & Profiles
+     - App Store Connect
+     - Resources and Support
+
+#### 1.2 Development Environment Setup
+
+1. **Install Xcode**
+   - Open Mac App Store
+   - Search for "Xcode"
+   - Install latest version (requires macOS)
+   - Open Xcode and accept license agreement
+   - Install additional components when prompted
+
+2. **Install Command Line Tools**
+   ```bash
+   xcode-select --install
+   ```
+
+3. **Verify Capacitor iOS Setup**
+   ```bash
+   npm run cap:sync
+   cd ios
+   pod install
+   ```
+
+#### 1.3 App Store Connect Setup
+
+1. **Create App Record**
+   - Go to https://appstoreconnect.apple.com
+   - Sign in with Apple Developer account
+   - Click "My Apps" → "+" → "New App"
+   - Fill in:
+     - **Platform**: iOS
+     - **Name**: BRICK
+     - **Primary Language**: English (U.S.)
+     - **Bundle ID**: `com.brick.app` (must match `capacitor.config.ts`)
+     - **SKU**: `brick-ios-001` (unique identifier)
+     - **User Access**: Full Access
+   - Click "Create"
+
+2. **App Information**
+   - **Category**: Productivity / Developer Tools
+   - **Subtitle**: Code. Share. Listen.
+   - **Privacy Policy URL**: (required) Your privacy policy URL
+   - **Support URL**: Your support website/email
+
+3. **Pricing and Availability**
+   - Set price (Free or Paid)
+   - Select countries/regions
+   - Set availability date
+
+#### 1.4 App Icons and Screenshots
+
+**Required Assets:**
+
+1. **App Icon**
+   - Size: 1024x1024 pixels
+   - Format: PNG or JPEG (no transparency)
+   - No rounded corners (Apple adds them)
+   - File: `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`
+
+2. **Screenshots** (Required for all device sizes)
+   - **iPhone 6.7" Display** (iPhone 14 Pro Max, etc.):
+     - 1290 x 2796 pixels (portrait)
+     - Minimum 1, maximum 10 screenshots
+   - **iPhone 6.5" Display** (iPhone 11 Pro Max, etc.):
+     - 1242 x 2688 pixels (portrait)
+   - **iPhone 5.5" Display** (iPhone 8 Plus, etc.):
+     - 1242 x 2208 pixels (portrait)
+   - **iPad Pro 12.9"**:
+     - 2048 x 2732 pixels (portrait)
+   - **iPad Pro 11"**:
+     - 1668 x 2388 pixels (portrait)
+
+3. **App Preview Videos** (Optional but recommended)
+   - 30 seconds max
+   - Same resolutions as screenshots
+   - Show app functionality
+
+#### 1.5 Privacy and Compliance
+
+**Required Privacy Information:**
+
+1. **Privacy Policy**
+   - Must be hosted on a publicly accessible URL
+   - Must cover:
+     - What data you collect
+     - How you use data
+     - Third-party services (OAuth providers, APIs)
+     - User rights
+   - Add URL in App Store Connect → App Information
+
+2. **App Privacy Details** (App Store Connect)
+   - Data Collection: Yes/No
+   - If Yes, specify:
+     - Types of data collected (User ID, Usage Data, etc.)
+     - Purpose of collection
+     - Whether data is linked to user identity
+     - Whether data is used for tracking
+
+3. **OAuth Provider Privacy Policies**
+   - Link to X/Twitter Privacy Policy
+   - Link to Reddit Privacy Policy
+   - Link to Discord Privacy Policy
+   - Link to Google/Microsoft Privacy Policy (for email)
+
+#### 1.6 Build Configuration
+
+**File**: `ios/App/App/Info.plist`
+
+Ensure these keys are set:
+
+```xml
+<key>CFBundleDisplayName</key>
+<string>BRICK</string>
+
+<key>CFBundleVersion</key>
+<string>1</string>
+
+<key>CFBundleShortVersionString</key>
+<string>1.0.0</string>
+
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <false/>
+</dict>
+
+<!-- OAuth URL Scheme -->
+<key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <string>com.brick.app</string>
+        </array>
+    </dict>
+</array>
+```
+
+**File**: `ios/App/App.xcodeproj/project.pbxproj`
+
+- Set **Deployment Target**: iOS 13.0 or higher
+- Set **Bundle Identifier**: `com.brick.app`
+- Configure **Signing & Capabilities**:
+  - Team: Your Apple Developer Team
+  - Provisioning Profile: Automatic or Manual
+
+#### 1.7 Certificates and Provisioning Profiles
+
+**Automatic Signing (Recommended):**
+
+1. Open `ios/App/App.xcodeproj` in Xcode
+2. Select project → **Signing & Capabilities** tab
+3. Check **"Automatically manage signing"**
+4. Select your **Team** (Apple Developer account)
+5. Xcode will automatically:
+   - Create certificates
+   - Create provisioning profiles
+   - Manage renewals
+
+**Manual Signing (Advanced):**
+
+1. Go to https://developer.apple.com/account/resources/certificates/list
+2. Create **Apple Distribution** certificate
+3. Create **App ID** (if not exists): `com.brick.app`
+4. Create **Provisioning Profile**:
+   - Type: App Store
+   - App ID: `com.brick.app`
+   - Certificate: Your Distribution certificate
+   - Download and install
+
+#### 1.8 Build and Archive
+
+1. **Open Project in Xcode**
+   ```bash
+   npm run cap:sync
+   npm run cap:open ios
+   ```
+
+2. **Select Build Target**
+   - Product → Scheme → App
+   - Product → Destination → Any iOS Device (or Generic iOS Device)
+
+3. **Archive**
+   - Product → Archive
+   - Wait for build to complete
+   - Xcode Organizer opens automatically
+
+4. **Validate Archive**
+   - Click "Validate App"
+   - Sign in with Apple ID
+   - Select your team
+   - Wait for validation (checks for common issues)
+
+5. **Distribute App**
+   - Click "Distribute App"
+   - Choose "App Store Connect"
+   - Choose "Upload"
+   - Select your team
+   - Choose distribution options:
+     - Upload your app's symbols (recommended)
+     - Manage Version and Build Number (if needed)
+   - Click "Upload"
+   - Wait for upload to complete
+
+#### 1.9 App Store Connect Submission
+
+1. **Go to App Store Connect**
+   - https://appstoreconnect.apple.com
+   - My Apps → BRICK
+
+2. **Select Build**
+   - Go to "TestFlight" or "App Store" tab
+   - Wait for build to process (10-30 minutes)
+   - Once processed, select build in "iOS App" section
+
+3. **Complete App Information**
+   - **Description**: App description (up to 4000 characters)
+   - **Keywords**: Comma-separated keywords (up to 100 characters)
+   - **Support URL**: Your support website
+   - **Marketing URL**: (Optional) Your marketing website
+   - **Promotional Text**: (Optional) Up to 170 characters
+
+4. **Version Information**
+   - **What's New in This Version**: Release notes
+   - **Copyright**: Your copyright notice
+   - **Version**: 1.0.0 (or increment)
+
+5. **App Review Information**
+   - **Contact Information**: Your contact details
+   - **Demo Account**: (If app requires login) Provide test account
+   - **Notes**: Any additional info for reviewers
+
+6. **Age Rating**
+   - Complete questionnaire
+   - App will be rated automatically (likely 4+ or 12+)
+
+7. **Submit for Review**
+   - Review all information
+   - Click "Submit for Review"
+   - Status changes to "Waiting for Review"
+
+#### 1.10 Review Process
+
+**Timeline:**
+- Initial review: 24-48 hours
+- If rejected: Fix issues and resubmit
+- If approved: App goes live immediately (or on scheduled date)
+
+**Common Rejection Reasons:**
+- Missing privacy policy
+- Incomplete app information
+- App crashes or bugs
+- Violation of App Store guidelines
+- Missing required permissions explanations
+
+---
+
+## Part 2: Google Play Store Distribution
+
+### Prerequisites
+
+#### 2.1 Google Play Console Account Setup
+
+1. **Create Google Account**
+   - Go to https://accounts.google.com
+   - Create account (if you don't have one)
+   - Enable 2-Step Verification (recommended)
+
+2. **Enroll in Google Play Console**
+   - Go to https://play.google.com/console
+   - Click "Get started"
+   - Pay one-time registration fee ($25)
+   - Complete account verification
+   - Accept Developer Distribution Agreement
+
+3. **Complete Account Details**
+   - Account name: Your developer name
+   - Contact details: Email, phone
+   - Address: Physical address (required)
+
+#### 2.2 Development Environment Setup
+
+1. **Install Android Studio**
+   - Download from https://developer.android.com/studio
+   - Install on Windows, macOS, or Linux
+   - Open Android Studio
+   - Install Android SDK (API level 33+ recommended)
+   - Install Android SDK Build-Tools
+
+2. **Set Up Android SDK**
+   ```bash
+   # Set ANDROID_HOME environment variable
+   export ANDROID_HOME=$HOME/Library/Android/sdk  # macOS
+   # or
+   export ANDROID_HOME=$HOME/Android/Sdk  # Linux
+   # or
+   set ANDROID_HOME=C:\Users\YourName\AppData\Local\Android\Sdk  # Windows
+
+   # Add to PATH
+   export PATH=$PATH:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools
+   ```
+
+3. **Verify Capacitor Android Setup**
+   ```bash
+   npm run cap:sync
+   cd android
+   ./gradlew tasks
+   ```
+
+#### 2.3 Play Console App Creation
+
+1. **Create App**
+   - Go to https://play.google.com/console
+   - Click "Create app"
+   - Fill in:
+     - **App name**: BRICK
+     - **Default language**: English (United States)
+     - **App or game**: App
+     - **Free or paid**: Free (or Paid)
+     - **Declarations**: Check all applicable boxes
+   - Click "Create app"
+
+2. **App Access**
+   - Choose: "All Google Play users" or "Testing" (for closed testing)
+
+#### 2.4 App Icons and Graphics
+
+**Required Assets:**
+
+1. **App Icon**
+   - Size: 512 x 512 pixels
+   - Format: PNG (32-bit with alpha) or JPEG
+   - File: `android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png`
+   - Also create: `ic_launcher_foreground.png` and `ic_launcher_background.png`
+
+2. **Feature Graphic** (Required)
+   - Size: 1024 x 500 pixels
+   - Format: PNG or JPEG
+   - Used in Play Store listing
+
+3. **Screenshots** (Required)
+   - **Phone**: Minimum 2, maximum 8
+     - At least one: 320-3840 pixels wide, 320-3840 pixels tall
+     - Aspect ratio: 16:9 or 9:16
+   - **Tablet** (Optional but recommended):
+     - 7" tablet: 600 x 960 to 1920 x 1920 pixels
+     - 10" tablet: 1200 x 1920 pixels
+
+4. **Promotional Graphics** (Optional)
+   - **Promo graphic**: 180 x 120 pixels
+   - **TV banner**: 1280 x 720 pixels
+   - **Phone banner**: 320 x 180 pixels
+
+#### 2.5 Privacy and Compliance
+
+**Required Privacy Information:**
+
+1. **Privacy Policy**
+   - Must be hosted on publicly accessible URL
+   - Must cover same topics as iOS
+   - Add URL in Play Console → App content → Privacy policy
+
+2. **Data Safety Section** (Required)
+   - Go to Play Console → App content → Data safety
+   - Answer questions about:
+     - Data collection and sharing
+     - Data security practices
+     - Data deletion requests
+   - This replaces the old "Privacy Policy" requirement
+
+3. **Content Rating**
+   - Complete questionnaire
+   - Get rating from IARC (International Age Rating Coalition)
+   - Usually results in "Everyone" or "Teen" rating
+
+4. **Target Audience**
+   - Select age groups
+   - Select content categories
+
+#### 2.6 Build Configuration
+
+**File**: `android/app/build.gradle`
+
+Ensure these are configured:
+
+```gradle
+android {
+    namespace "com.brick.app"
+    compileSdkVersion 34
+    
+    defaultConfig {
+        applicationId "com.brick.app"
+        minSdkVersion 22
+        targetSdkVersion 34
+        versionCode 1
+        versionName "1.0.0"
+    }
+    
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+    }
+    
+    signingConfigs {
+        release {
+            // Configure signing (see next section)
+        }
+    }
+}
+```
+
+**File**: `android/app/src/main/AndroidManifest.xml`
+
+Ensure these are set:
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.brick.app">
+
+    <application
+        android:label="BRICK"
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="false">
+        
+        <!-- OAuth URL Scheme -->
+        <activity>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.brick.app" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+```
+
+#### 2.7 App Signing
+
+**Option 1: Google Play App Signing (Recommended)**
+
+1. **Generate Upload Key**
+   ```bash
+   keytool -genkey -v -keystore brick-upload-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias brick-upload
+   ```
+   - Store password securely
+   - Store key file securely (backup!)
+
+2. **Enable Play App Signing**
+   - In Play Console → Setup → App signing
+   - Choose "Let Google manage and protect your app signing key"
+   - Upload your upload key
+   - Google will manage the app signing key
+
+**Option 2: Manual Signing**
+
+1. **Generate Release Key**
+   ```bash
+   keytool -genkey -v -keystore brick-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias brick-release
+   ```
+
+2. **Configure Signing**
+   - Create `android/key.properties`:
+     ```
+     storePassword=your-store-password
+     keyPassword=your-key-password
+     keyAlias=brick-release
+     storeFile=../brick-release-key.jks
+     ```
+   - Update `android/app/build.gradle` to use this key
+   - **IMPORTANT**: Keep this key secure and backed up!
+
+#### 2.8 Build Release APK/AAB
+
+**Option 1: Build AAB (Recommended for Play Store)**
+
+```bash
+cd android
+./gradlew bundleRelease
+```
+
+Output: `android/app/build/outputs/bundle/release/app-release.aab`
+
+**Option 2: Build APK**
+
+```bash
+cd android
+./gradlew assembleRelease
+```
+
+Output: `android/app/build/outputs/apk/release/app-release.apk`
+
+**Verify Build:**
+```bash
+# Check AAB
+bundletool build-apks --bundle=app-release.aab --output=app.apks
+
+# Or install APK on device
+adb install app-release.apk
+```
+
+#### 2.9 Play Console Submission
+
+1. **Go to Play Console**
+   - https://play.google.com/console
+   - Select your app: BRICK
+
+2. **Create Release**
+   - Go to "Production" (or "Testing" → "Internal testing")
+   - Click "Create new release"
+   - Upload AAB file (or APK)
+   - Add release name: "1.0.0"
+   - Add release notes: What's new in this version
+
+3. **Complete Store Listing**
+   - **Short description**: Up to 80 characters
+   - **Full description**: Up to 4000 characters
+   - **App icon**: Upload 512x512 icon
+   - **Feature graphic**: Upload 1024x500 graphic
+   - **Screenshots**: Upload required screenshots
+   - **Category**: Productivity / Developer Tools
+   - **Tags**: Add relevant tags
+
+4. **Content Rating**
+   - Complete questionnaire
+   - Get IARC rating certificate
+
+5. **Pricing and Distribution**
+   - Set price (Free or Paid)
+   - Select countries/regions
+   - Set content rating
+   - Accept content guidelines
+
+6. **Review and Rollout**
+   - Review all information
+   - Click "Start rollout to Production"
+   - Status: "Under review" (usually 1-3 days)
+
+#### 2.10 Review Process
+
+**Timeline:**
+- Initial review: 1-3 days
+- If rejected: Fix issues and resubmit
+- If approved: App goes live immediately
+
+**Common Rejection Reasons:**
+- Missing privacy policy or data safety information
+- App crashes or bugs
+- Violation of content policies
+- Missing required permissions explanations
+- Incomplete store listing
+
+---
+
+## Part 3: Common Prerequisites Checklist
+
+### Accounts & Subscriptions
+
+- [ ] Apple Developer Account ($99/year) - Active
+- [ ] Google Play Console Account ($25 one-time) - Active
+- [ ] Apple ID with 2FA enabled
+- [ ] Google Account with 2FA enabled
+
+### Development Environment
+
+**iOS:**
+- [ ] Mac computer (required)
+- [ ] Xcode installed and updated
+- [ ] Command Line Tools installed
+- [ ] CocoaPods installed (`sudo gem install cocoapods`)
+- [ ] iOS Simulator working
+
+**Android:**
+- [ ] Android Studio installed
+- [ ] Android SDK installed (API 33+)
+- [ ] Android SDK Build-Tools installed
+- [ ] Java Development Kit (JDK) installed
+- [ ] Android Emulator or physical device
+
+### App Assets
+
+- [ ] App icon (1024x1024 for iOS, 512x512 for Android)
+- [ ] Screenshots for all required device sizes
+- [ ] Feature graphic (Android: 1024x500)
+- [ ] App preview videos (optional but recommended)
+
+### Legal & Compliance
+
+- [ ] Privacy Policy hosted on public URL
+- [ ] Terms of Service (recommended)
+- [ ] Copyright information
+- [ ] Data Safety information completed (Android)
+- [ ] App Privacy details completed (iOS)
+- [ ] Age rating questionnaire completed
+
+### App Configuration
+
+- [ ] Bundle ID/Package name: `com.brick.app`
+- [ ] App name: BRICK
+- [ ] Version: 1.0.0
+- [ ] Build number: 1 (increment for each build)
+- [ ] OAuth redirect URIs configured:
+  - iOS: `com.brick.app://auth/{platform}/callback`
+  - Android: `com.brick.app://auth/{platform}/callback`
+- [ ] App icons set in both platforms
+- [ ] Splash screens configured
+
+### Testing
+
+- [ ] Test on physical iOS device
+- [ ] Test on physical Android device
+- [ ] Test OAuth flows on both platforms
+- [ ] Test all app features
+- [ ] Test offline functionality
+- [ ] Test with different network conditions
+- [ ] Test with different screen sizes
+- [ ] No crashes or critical bugs
+
+### Store Listings
+
+**App Store Connect:**
+- [ ] App name and subtitle
+- [ ] Description (up to 4000 characters)
+- [ ] Keywords (up to 100 characters)
+- [ ] Support URL
+- [ ] Marketing URL (optional)
+- [ ] Privacy Policy URL
+- [ ] Screenshots for all device sizes
+- [ ] App preview videos (optional)
+- [ ] Category selected
+- [ ] Age rating completed
+
+**Play Console:**
+- [ ] App name
+- [ ] Short description (up to 80 characters)
+- [ ] Full description (up to 4000 characters)
+- [ ] App icon (512x512)
+- [ ] Feature graphic (1024x500)
+- [ ] Screenshots (minimum 2)
+- [ ] Privacy Policy URL
+- [ ] Data Safety section completed
+- [ ] Content rating completed
+- [ ] Category selected
+
+### Build & Signing
+
+**iOS:**
+- [ ] Xcode project opens without errors
+- [ ] Automatic signing configured (or manual certificates)
+- [ ] Provisioning profile valid
+- [ ] Archive builds successfully
+- [ ] Archive validates successfully
+- [ ] Archive uploads to App Store Connect
+
+**Android:**
+- [ ] Android project builds without errors
+- [ ] Release signing key generated
+- [ ] Key stored securely and backed up
+- [ ] AAB builds successfully
+- [ ] AAB uploads to Play Console
+
+### Pre-Submission Checklist
+
+- [ ] All features working
+- [ ] No placeholder content
+- [ ] No test/debug code
+- [ ] Error handling implemented
+- [ ] Loading states implemented
+- [ ] Offline handling (if applicable)
+- [ ] Privacy policy accessible
+- [ ] Support contact information provided
+- [ ] App complies with store guidelines
+- [ ] All required permissions explained
+- [ ] OAuth flows tested and working
+- [ ] No hardcoded secrets or API keys
+
+---
+
+## Part 4: Submission Timeline
+
+### iOS App Store
+
+1. **Preparation**: 1-2 days
+   - Complete store listing
+   - Prepare screenshots
+   - Write descriptions
+
+2. **Build & Upload**: 1-2 hours
+   - Build archive in Xcode
+   - Upload to App Store Connect
+   - Wait for processing (10-30 minutes)
+
+3. **Submission**: 30 minutes
+   - Complete app information
+   - Submit for review
+
+4. **Review**: 24-48 hours
+   - Apple reviews app
+   - May request changes
+
+5. **Release**: Immediate (or scheduled)
+   - App goes live after approval
+
+**Total Time**: 2-4 days (if approved on first try)
+
+### Google Play Store
+
+1. **Preparation**: 1-2 days
+   - Complete store listing
+   - Prepare graphics
+   - Complete data safety form
+
+2. **Build & Upload**: 1-2 hours
+   - Build AAB
+   - Upload to Play Console
+   - Wait for processing (few minutes)
+
+3. **Submission**: 30 minutes
+   - Complete store listing
+   - Start rollout
+
+4. **Review**: 1-3 days
+   - Google reviews app
+   - May request changes
+
+5. **Release**: Immediate after approval
+
+**Total Time**: 2-5 days (if approved on first try)
+
+---
+
+## Part 5: Post-Submission
+
+### Monitoring
+
+**App Store Connect:**
+- Monitor app status
+- Check for review updates
+- Respond to review feedback
+- Monitor crash reports
+- Check analytics
+
+**Play Console:**
+- Monitor app status
+- Check for review updates
+- Respond to review feedback
+- Monitor crash reports
+- Check analytics
+- Monitor user reviews
+
+### Updates
+
+**Version Updates:**
+- Increment version number
+- Update build number
+- Add release notes
+- Build and upload new version
+- Submit for review
+
+**Hotfixes:**
+- Fix critical bugs
+- Increment patch version (e.g., 1.0.0 → 1.0.1)
+- Fast-track review (if available)
+
+---
+
+## Part 6: Cost Summary
+
+### One-Time Costs
+
+- Google Play Console registration: **$25**
+- Apple Developer Program: **$99/year**
+
+### Ongoing Costs
+
+- Apple Developer Program renewal: **$99/year**
+- Google Play Console: **Free** (after one-time fee)
+- Hosting privacy policy: **Free** (GitHub Pages) or **~$5-10/month** (hosting)
+
+### Total First Year
+
+- **Minimum**: $124 ($25 + $99)
+- **Recommended**: $150-200 (including hosting, domains, etc.)
+
+---
+
+## Part 7: Resources
+
+### Apple Resources
+
+- [Apple Developer Documentation](https://developer.apple.com/documentation/)
+- [App Store Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)
+- [App Store Connect Help](https://help.apple.com/app-store-connect/)
+- [Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/)
+
+### Google Resources
+
+- [Android Developer Documentation](https://developer.android.com/docs)
+- [Play Console Help](https://support.google.com/googleplay/android-developer/)
+- [Play Console Policy](https://play.google.com/about/developer-content-policy/)
+- [Material Design Guidelines](https://material.io/design)
+
+### Capacitor Resources
+
+- [Capacitor iOS Guide](https://capacitorjs.com/docs/ios)
+- [Capacitor Android Guide](https://capacitorjs.com/docs/android)
+- [Capacitor App Store Deployment](https://capacitorjs.com/docs/guides/deploying)
+
+---
+
 # Simulated Endpoints & Mock Data Analysis
 
 # Simulated Endpoints & Mock Data Analysis
@@ -1973,6 +2830,1151 @@ See [SIMULATION_DOCUMENTATION.txt](./SIMULATION_DOCUMENTATION.txt) for a detaile
 ---
 
 *Built with flow state in mind.*
+
+---
+
+# Global Channel Components Setup
+
+This section outlines how to set up **Inbound Channels** (Input Channels), **Outbound Channels** (Output Channels), and **Feedback Channels** as global, reusable components following the same architectural pattern.
+
+## Overview
+
+All three channel types should follow a consistent architecture:
+
+1. **Service Layer** - Platform-agnostic unified service (`services/{channelType}Service.ts`)
+2. **Platform Implementations** - Platform-specific services in `services/platforms/` folder
+3. **Context Provider** - React context for global state management (`contexts/{ChannelType}Context.tsx`)
+4. **UI Components** - Components that consume the context and services
+
+**Reference Implementation**: Feedback Channels are already implemented following this pattern and serve as the template.
+
+---
+
+## 1. Feedback Channels (Already Implemented - Reference Pattern)
+
+### Current Architecture
+
+**Service Layer**: `services/feedbackService.ts`
+- `fetchAllFeedback(options)` - Unified function to fetch from all platforms
+- `fetchPlatformFeedback(platform, options)` - Fetch from specific platform
+- `PlatformFeedbackService` interface - Contract for platform implementations
+
+**Platform Implementations**: `services/platforms/`
+- `xFeedbackService.ts` - X/Twitter feedback implementation
+- `redditFeedbackService.ts` - (TODO) Reddit feedback implementation
+- `discordFeedbackService.ts` - (TODO) Discord feedback implementation
+- `emailFeedbackService.ts` - (TODO) Email feedback implementation
+
+**Context**: Uses `ConnectionContext` to check platform connections
+
+**UI Component**: `components/FeedbackPanel.tsx` - Consumes `feedbackService` and `ConnectionContext`
+
+### Pattern Summary
+
+```typescript
+// Unified Service Interface
+interface PlatformFeedbackService {
+  fetchFeedback(options?: FeedbackFetchOptions): Promise<FeedbackItem[]>;
+  isConnected(): Promise<boolean>;
+}
+
+// Unified Service Function
+export async function fetchAllFeedback(options: FeedbackFetchOptions): Promise<FeedbackItem[]> {
+  // Check each platform's connection status
+  // Fetch from connected platforms in parallel
+  // Aggregate and return results
+}
+
+// Platform-Specific Implementation
+export async function fetchXFeedback(options: FeedbackFetchOptions): Promise<FeedbackItem[]> {
+  // Platform-specific API calls
+  // Transform to unified FeedbackItem format
+}
+```
+
+---
+
+## 2. Inbound Channels (Input Channels) - Global Component Setup
+
+### Architecture Overview
+
+Create a unified service layer for input channels that aggregates data from MCP, Git, and File Watcher sources.
+
+### Step 1: Create Unified Input Channels Service
+
+**File**: `services/inputChannelsService.ts`
+
+```typescript
+import { InputChannelEvent, InputChannelStatus } from '../types/inputChannels';
+import { fetchMCPContext } from './platforms/mcpInputService';
+import { fetchGitCommits } from './platforms/gitInputService';
+import { fetchFileChanges } from './platforms/fileWatcherInputService';
+
+export interface InputChannelFetchOptions {
+  since?: number; // Unix timestamp in milliseconds
+  limit?: number;
+  channel?: 'mcp' | 'git' | 'watcher' | 'all';
+}
+
+export interface PlatformInputService {
+  /**
+   * Fetch input events from this channel
+   */
+  fetchEvents(options?: InputChannelFetchOptions): Promise<InputChannelEvent[]>;
+  
+  /**
+   * Check if this channel is active/connected
+   */
+  isActive(): Promise<boolean>;
+}
+
+/**
+ * Fetch input events from all active input channels
+ */
+export async function fetchAllInputEvents(
+  options: InputChannelFetchOptions = {}
+): Promise<InputChannelEvent[]> {
+  const allEvents: InputChannelEvent[] = [];
+  const channelPromises: Promise<InputChannelEvent[]>[] = [];
+  
+  // MCP Channel
+  try {
+    const mcpService = {
+      fetchEvents: fetchMCPContext,
+      isActive: async () => {
+        const { getMCPStatus } = await import('./mcpServerService');
+        const status = await getMCPStatus();
+        return status.running && status.connections > 0;
+      }
+    };
+    
+    if (await mcpService.isActive()) {
+      if (!options.channel || options.channel === 'mcp' || options.channel === 'all') {
+        channelPromises.push(
+          mcpService.fetchEvents(options).catch(error => {
+            console.error('Failed to fetch MCP events:', error);
+            return [];
+          })
+        );
+      }
+    }
+  } catch (error) {
+    console.error('Error checking MCP status:', error);
+  }
+  
+  // Git Channel
+  try {
+    const gitService = {
+      fetchEvents: fetchGitCommits,
+      isActive: async () => {
+        const { getGitStatus } = await import('./gitService');
+        const status = await getGitStatus();
+        return status.active;
+      }
+    };
+    
+    if (await gitService.isActive()) {
+      if (!options.channel || options.channel === 'git' || options.channel === 'all') {
+        channelPromises.push(
+          gitService.fetchEvents(options).catch(error => {
+            console.error('Failed to fetch Git events:', error);
+            return [];
+          })
+        );
+      }
+    }
+  } catch (error) {
+    console.error('Error checking Git status:', error);
+  }
+  
+  // File Watcher Channel
+  try {
+    const watcherService = {
+      fetchEvents: fetchFileChanges,
+      isActive: async () => {
+        const { getWatcherStatus } = await import('./fileWatcherService');
+        const status = await getWatcherStatus();
+        return status.active && status.folders.length > 0;
+      }
+    };
+    
+    if (await watcherService.isActive()) {
+      if (!options.channel || options.channel === 'watcher' || options.channel === 'all') {
+        channelPromises.push(
+          watcherService.fetchEvents(options).catch(error => {
+            console.error('Failed to fetch file watcher events:', error);
+            return [];
+          })
+        );
+      }
+    }
+  } catch (error) {
+    console.error('Error checking file watcher status:', error);
+  }
+  
+  // Wait for all channel fetches to complete
+  const results = await Promise.all(channelPromises);
+  
+  // Flatten and sort by timestamp (newest first)
+  results.forEach(events => allEvents.push(...events));
+  
+  return allEvents.sort((a, b) => b.timestamp - a.timestamp);
+}
+
+/**
+ * Fetch events from a specific input channel
+ */
+export async function fetchChannelEvents(
+  channel: 'mcp' | 'git' | 'watcher',
+  options: InputChannelFetchOptions = {}
+): Promise<InputChannelEvent[]> {
+  switch (channel) {
+    case 'mcp':
+      return await fetchMCPContext(options);
+    case 'git':
+      return await fetchGitCommits(options);
+    case 'watcher':
+      return await fetchFileChanges(options);
+    default:
+      return [];
+  }
+}
+```
+
+### Step 2: Create Platform-Specific Input Services
+
+**File**: `services/platforms/mcpInputService.ts`
+
+```typescript
+import { InputChannelEvent, MCPContextEvent } from '../../types/inputChannels';
+import { InputChannelFetchOptions } from '../inputChannelsService';
+
+/**
+ * Fetch MCP context events (log_progress tool calls)
+ */
+export async function fetchMCPContext(
+  options: InputChannelFetchOptions = {}
+): Promise<InputChannelEvent[]> {
+  const { getMCPEvents } = await import('../mcpServerService');
+  const events = await getMCPEvents(options);
+  
+  return events.map(event => ({
+    id: `mcp-${event.timestamp}`,
+    channel: 'mcp',
+    type: event.type,
+    summary: event.summary,
+    timestamp: event.timestamp,
+    source: 'mcp',
+  }));
+}
+```
+
+**File**: `services/platforms/gitInputService.ts`
+
+```typescript
+import { InputChannelEvent, GitCommitEvent } from '../../types/inputChannels';
+import { InputChannelFetchOptions } from '../inputChannelsService';
+
+/**
+ * Fetch Git commit events
+ */
+export async function fetchGitCommits(
+  options: InputChannelFetchOptions = {}
+): Promise<InputChannelEvent[]> {
+  const { getGitCommits } = await import('../gitService');
+  const commits = await getGitCommits(options);
+  
+  return commits.map(commit => ({
+    id: `git-${commit.hash}`,
+    channel: 'git',
+    type: 'commit',
+    summary: commit.message,
+    timestamp: commit.timestamp,
+    source: 'git',
+    metadata: {
+      hash: commit.hash,
+      diff: commit.diff,
+    },
+  }));
+}
+```
+
+**File**: `services/platforms/fileWatcherInputService.ts`
+
+```typescript
+import { InputChannelEvent, FileChangeEvent } from '../../types/inputChannels';
+import { InputChannelFetchOptions } from '../inputChannelsService';
+
+/**
+ * Fetch file change events from watcher
+ */
+export async function fetchFileChanges(
+  options: InputChannelFetchOptions = {}
+): Promise<InputChannelEvent[]> {
+  const { getFileChanges } = await import('../fileWatcherService');
+  const changes = await getFileChanges(options);
+  
+  return changes.map(change => ({
+    id: `watcher-${change.filePath}-${change.timestamp}`,
+    channel: 'watcher',
+    type: change.changeType,
+    summary: `File ${change.changeType}: ${change.filePath}`,
+    timestamp: change.timestamp,
+    source: 'watcher',
+    metadata: {
+      filePath: change.filePath,
+      diff: change.diff,
+    },
+  }));
+}
+```
+
+### Step 3: Create Input Channels Context
+
+**File**: `contexts/InputChannelsContext.tsx`
+
+```typescript
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { InputChannelStatus, InputChannelEvent } from '../types/inputChannels';
+import { fetchAllInputEvents, InputChannelFetchOptions } from '../services/inputChannelsService';
+import { getInputChannelStatus } from '../services/inputChannelsService';
+
+interface InputChannelsContextType {
+  status: InputChannelStatus;
+  events: InputChannelEvent[];
+  loading: boolean;
+  error: string | null;
+  refreshStatus: () => Promise<void>;
+  refreshEvents: (options?: InputChannelFetchOptions) => Promise<void>;
+  hasAnyActiveChannel: () => boolean;
+  isChannelActive: (channel: 'mcp' | 'git' | 'watcher') => boolean;
+}
+
+const InputChannelsContext = createContext<InputChannelsContextType | undefined>(undefined);
+
+export const useInputChannels = () => {
+  const context = useContext(InputChannelsContext);
+  if (!context) {
+    throw new Error('useInputChannels must be used within InputChannelsProvider');
+  }
+  return context;
+};
+
+export const InputChannelsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [status, setStatus] = useState<InputChannelStatus>({
+    mcp: { active: false, serverUrl: null, port: null, agentType: null, connections: 0 },
+    git: { active: false, repoPath: null, repoType: null },
+    watcher: { active: false, folders: [] },
+  });
+  const [events, setEvents] = useState<InputChannelEvent[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshStatus = async () => {
+    try {
+      const newStatus = await getInputChannelStatus();
+      setStatus(newStatus);
+    } catch (err) {
+      console.error('Failed to refresh input channel status:', err);
+      setError(err instanceof Error ? err.message : 'Failed to refresh status');
+    }
+  };
+
+  const refreshEvents = async (options?: InputChannelFetchOptions) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const newEvents = await fetchAllInputEvents(options);
+      setEvents(newEvents);
+    } catch (err) {
+      console.error('Failed to refresh input events:', err);
+      setError(err instanceof Error ? err.message : 'Failed to refresh events');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check status on mount
+  useEffect(() => {
+    refreshStatus();
+  }, []);
+
+  // Refresh events when status changes
+  useEffect(() => {
+    if (hasAnyActiveChannel()) {
+      refreshEvents();
+    }
+  }, [status.mcp.active, status.git.active, status.watcher.active]);
+
+  // Listen for real-time events
+  useEffect(() => {
+    // Set up event listeners for each active channel
+    // MCP events, Git hooks, File watcher events
+    // This would be implemented in the respective services
+    
+    return () => {
+      // Cleanup listeners
+    };
+  }, [status]);
+
+  const hasAnyActiveChannel = () => {
+    return status.mcp.active || status.git.active || status.watcher.active;
+  };
+
+  const isChannelActive = (channel: 'mcp' | 'git' | 'watcher') => {
+    return status[channel].active;
+  };
+
+  return (
+    <InputChannelsContext.Provider
+      value={{
+        status,
+        events,
+        loading,
+        error,
+        refreshStatus,
+        refreshEvents,
+        hasAnyActiveChannel,
+        isChannelActive,
+      }}
+    >
+      {children}
+    </InputChannelsContext.Provider>
+  );
+};
+```
+
+### Step 4: Update Types
+
+**File**: `types/inputChannels.ts` (add to existing types)
+
+```typescript
+// Add to existing InputChannelStatus, MCPContextEvent, GitCommitEvent, FileChangeEvent
+
+export interface InputChannelEvent {
+  id: string;
+  channel: 'mcp' | 'git' | 'watcher';
+  type: string;
+  summary: string;
+  timestamp: number;
+  source: string;
+  metadata?: Record<string, any>;
+}
+```
+
+### Step 5: Update DraftsPanel to Use Input Channels Context
+
+**File**: `components/DraftsPanel.tsx`
+
+```typescript
+import { useInputChannels } from '../contexts/InputChannelsContext';
+
+// In component:
+const { events, refreshEvents } = useInputChannels();
+
+// Use events instead of SAMPLE_CODE_SNIPPET
+// When new event arrives, trigger draft generation
+useEffect(() => {
+  if (events.length > 0) {
+    const latestEvent = events[0];
+    handleGenerate(latestEvent.summary);
+  }
+}, [events]);
+```
+
+### Step 6: Integration Checklist
+
+- [ ] Create `services/inputChannelsService.ts` with unified interface
+- [ ] Create `services/platforms/mcpInputService.ts`
+- [ ] Create `services/platforms/gitInputService.ts`
+- [ ] Create `services/platforms/fileWatcherInputService.ts`
+- [ ] Create `contexts/InputChannelsContext.tsx`
+- [ ] Update `types/inputChannels.ts` with `InputChannelEvent` interface
+- [ ] Wrap App with `InputChannelsProvider`
+- [ ] Update `DraftsPanel` to use `useInputChannels()` hook
+- [ ] Update `SettingsPanel` to show real channel status from context
+- [ ] Test with all three channels active
+- [ ] Test with individual channels
+- [ ] Test with no channels active
+
+---
+
+## 3. Outbound Channels (Output Channels) - Global Component Setup
+
+### Architecture Overview
+
+Create a unified posting service that abstracts platform-specific posting logic, similar to how feedback channels work.
+
+### Step 1: Create Unified Posting Service
+
+**File**: `services/postingService.ts`
+
+```typescript
+import { Draft, Platform } from '../types';
+import { postToX, postTweetThread } from './xOAuthService';
+import { postToReddit } from './platforms/redditPostingService';
+import { postToDiscord } from './platforms/discordPostingService';
+import { sendEmail } from './platforms/emailPostingService';
+
+export interface PostingOptions {
+  mediaIds?: string[];
+  subreddit?: string; // For Reddit
+  webhookUrl?: string; // For Discord
+  recipients?: string[]; // For Email
+}
+
+export interface PlatformPostingService {
+  /**
+   * Post content to this platform
+   */
+  post(content: string, title?: string, options?: PostingOptions): Promise<any>;
+  
+  /**
+   * Check if this platform is connected
+   */
+  isConnected(): Promise<boolean>;
+}
+
+/**
+ * Post draft to the specified platform
+ */
+export async function postToPlatform(
+  platform: Platform,
+  draft: Draft,
+  options?: PostingOptions
+): Promise<{ success: boolean; result?: any; error?: string }> {
+  try {
+    // Check if platform is connected
+    const isConnected = await checkPlatformConnection(platform);
+    if (!isConnected) {
+      throw new Error(`${platform} account is not connected. Please connect in Settings.`);
+    }
+
+    let result: any;
+
+    switch (platform) {
+      case Platform.X:
+        // Check if content should be posted as thread
+        const threadTweets = draft.content.split(/\n\n+/).filter(t => t.trim().length > 0);
+        if (threadTweets.length > 1) {
+          result = await postTweetThread(threadTweets, options?.mediaIds?.map(id => [id]));
+        } else {
+          result = await postToX(draft.content.trim(), options?.mediaIds);
+        }
+        break;
+
+      case Platform.REDDIT:
+        if (!draft.title) {
+          throw new Error('Reddit posts require a title');
+        }
+        if (!options?.subreddit) {
+          throw new Error('Subreddit is required for Reddit posts');
+        }
+        result = await postToReddit(options.subreddit, draft.title, draft.content);
+        break;
+
+      case Platform.DISCORD:
+        if (!options?.webhookUrl) {
+          throw new Error('Webhook URL is required for Discord posts');
+        }
+        result = await postToDiscord(options.webhookUrl, draft.content);
+        break;
+
+      case Platform.EMAIL:
+        if (!draft.title) {
+          throw new Error('Email requires a subject');
+        }
+        if (!options?.recipients || options.recipients.length === 0) {
+          throw new Error('Email recipients are required');
+        }
+        result = await sendEmail(options.recipients, draft.title, draft.content);
+        break;
+
+      default:
+        throw new Error(`Unsupported platform: ${platform}`);
+    }
+
+    return { success: true, result };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`Failed to post to ${platform}:`, error);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Check if a platform is connected
+ */
+async function checkPlatformConnection(platform: Platform): Promise<boolean> {
+  switch (platform) {
+    case Platform.X:
+      const { isXConnected } = await import('./xOAuthService');
+      return await isXConnected();
+    case Platform.REDDIT:
+      const { isRedditConnected } = await import('./redditOAuthService');
+      return await isRedditConnected();
+    case Platform.DISCORD:
+      const { isDiscordConnected } = await import('./discordOAuthService');
+      return await isDiscordConnected();
+    case Platform.EMAIL:
+      const { isEmailConnected } = await import('./emailOAuthService');
+      return await isEmailConnected();
+    default:
+      return false;
+  }
+}
+
+/**
+ * Post to X/Twitter (wrapper for xOAuthService)
+ */
+export async function postToX(
+  content: string,
+  mediaIds?: string[]
+): Promise<{ data: any; rateLimit?: any }> {
+  const { postTweet } = await import('./xOAuthService');
+  return await postTweet(content, mediaIds);
+}
+
+/**
+ * Post to Reddit
+ */
+export async function postToReddit(
+  subreddit: string,
+  title: string,
+  content: string
+): Promise<any> {
+  const { postToReddit: postReddit } = await import('./platforms/redditPostingService');
+  return await postReddit(subreddit, title, content);
+}
+
+/**
+ * Post to Discord
+ */
+export async function postToDiscord(
+  webhookUrl: string,
+  content: string
+): Promise<any> {
+  const { postToDiscord: postDiscord } = await import('./platforms/discordPostingService');
+  return await postDiscord(webhookUrl, content);
+}
+
+/**
+ * Send Email
+ */
+export async function sendEmail(
+  recipients: string[],
+  subject: string,
+  content: string
+): Promise<any> {
+  const { sendEmail: sendEmailMessage } = await import('./platforms/emailPostingService');
+  return await sendEmailMessage(recipients, subject, content);
+}
+```
+
+### Step 2: Create Platform-Specific Posting Services
+
+**File**: `services/platforms/redditPostingService.ts`
+
+```typescript
+import { ensureValidRedditToken } from '../redditOAuthService';
+import { isNativePlatform } from '../../utils/platform';
+
+const getApiUrl = (path: string): string => {
+  const baseUrl = isNativePlatform() ? 'https://oauth.reddit.com' : '/api/reddit';
+  return `${baseUrl}${path}`;
+};
+
+/**
+ * Post to Reddit
+ */
+export async function postToReddit(
+  subreddit: string,
+  title: string,
+  text: string
+): Promise<any> {
+  const accessToken = await ensureValidRedditToken();
+
+  const response = await fetch(getApiUrl('/api/submit'), {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      sr: subreddit,
+      kind: 'self',
+      title: title,
+      text: text,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to post to Reddit: ${error}`);
+  }
+
+  return await response.json();
+}
+```
+
+**File**: `services/platforms/discordPostingService.ts`
+
+```typescript
+/**
+ * Post to Discord via Webhook
+ */
+export async function postToDiscord(
+  webhookUrl: string,
+  content: string
+): Promise<any> {
+  const response = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      content: content,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to post to Discord: ${error}`);
+  }
+
+  return await response.json();
+}
+```
+
+**File**: `services/platforms/emailPostingService.ts`
+
+```typescript
+import { ensureValidEmailToken } from '../emailOAuthService';
+
+/**
+ * Send email via Gmail/Outlook API
+ */
+export async function sendEmail(
+  recipients: string[],
+  subject: string,
+  content: string
+): Promise<any> {
+  const accessToken = await ensureValidEmailToken();
+
+  // Use Gmail API or Outlook API based on token
+  const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      raw: btoa(
+        `To: ${recipients.join(', ')}\r\n` +
+        `Subject: ${subject}\r\n` +
+        `Content-Type: text/html; charset=utf-8\r\n\r\n` +
+        content
+      ),
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to send email: ${error}`);
+  }
+
+  return await response.json();
+}
+```
+
+### Step 3: Create Output Channels Context (Optional)
+
+**File**: `contexts/OutputChannelsContext.tsx`
+
+```typescript
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { Platform } from '../types';
+import { postToPlatform, PostingOptions } from '../services/postingService';
+import { Draft } from '../types';
+
+interface OutputChannelsContextType {
+  posting: boolean;
+  postDraft: (platform: Platform, draft: Draft, options?: PostingOptions) => Promise<{ success: boolean; error?: string }>;
+}
+
+const OutputChannelsContext = createContext<OutputChannelsContextType | undefined>(undefined);
+
+export const useOutputChannels = () => {
+  const context = useContext(OutputChannelsContext);
+  if (!context) {
+    throw new Error('useOutputChannels must be used within OutputChannelsProvider');
+  }
+  return context;
+};
+
+export const OutputChannelsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [posting, setPosting] = useState(false);
+
+  const postDraft = async (
+    platform: Platform,
+    draft: Draft,
+    options?: PostingOptions
+  ): Promise<{ success: boolean; error?: string }> => {
+    setPosting(true);
+    try {
+      const result = await postToPlatform(platform, draft, options);
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  return (
+    <OutputChannelsContext.Provider
+      value={{
+        posting,
+        postDraft,
+      }}
+    >
+      {children}
+    </OutputChannelsContext.Provider>
+  );
+};
+```
+
+### Step 4: Update DraftsPanel to Use Posting Service
+
+**File**: `components/DraftsPanel.tsx`
+
+```typescript
+import { postToPlatform } from '../services/postingService';
+// Or use context:
+// import { useOutputChannels } from '../contexts/OutputChannelsContext';
+
+const handlePost = async () => {
+  if (!currentDraft) return;
+
+  // Validate connection
+  const platformMap: Record<Platform, 'x' | 'reddit' | 'discord' | 'email' | null> = {
+    [Platform.ALL]: null,
+    [Platform.X]: 'x',
+    [Platform.REDDIT]: 'reddit',
+    [Platform.DISCORD]: 'discord',
+    [Platform.EMAIL]: 'email',
+  };
+
+  const platformKey = platformMap[currentDraft.platform];
+  if (platformKey && !isConnected(platformKey)) {
+    alert(`Please connect your ${currentDraft.platform} account first. Go to Settings to connect.`);
+    return;
+  }
+
+  setIsPosting(true);
+
+  try {
+    // Use unified posting service
+    const options: PostingOptions = {};
+    
+    if (currentDraft.platform === Platform.REDDIT) {
+      // Get subreddit from user input or settings
+      options.subreddit = 'your-subreddit'; // TODO: Get from user input
+    } else if (currentDraft.platform === Platform.DISCORD) {
+      // Get webhook URL from settings
+      options.webhookUrl = 'your-webhook-url'; // TODO: Get from settings
+    } else if (currentDraft.platform === Platform.EMAIL) {
+      // Get recipients from user input
+      options.recipients = ['recipient@example.com']; // TODO: Get from user input
+    }
+
+    const result = await postToPlatform(currentDraft.platform, currentDraft, options);
+
+    if (result.success) {
+      // Mark as posted and add to history
+      const postedDraft = { ...currentDraft, posted: true };
+      setHistory(prev => [postedDraft, ...prev]);
+      setCurrentDraft(null);
+    } else {
+      alert(`Failed to post: ${result.error}`);
+    }
+  } catch (error) {
+    console.error('Failed to post:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    alert(`Failed to post: ${errorMessage}`);
+  } finally {
+    setIsPosting(false);
+  }
+};
+```
+
+### Step 5: Integration Checklist
+
+- [ ] Create `services/postingService.ts` with unified `postToPlatform()` function
+- [ ] Create `services/platforms/redditPostingService.ts`
+- [ ] Create `services/platforms/discordPostingService.ts`
+- [ ] Create `services/platforms/emailPostingService.ts`
+- [ ] Create `contexts/OutputChannelsContext.tsx` (optional, for global state)
+- [ ] Update `DraftsPanel` to use `postToPlatform()` instead of direct platform calls
+- [ ] Add subreddit selection UI for Reddit posts
+- [ ] Add webhook URL configuration in Settings for Discord
+- [ ] Add recipient selection UI for Email posts
+- [ ] Test posting to X (single tweet and thread)
+- [ ] Test posting to Reddit
+- [ ] Test posting to Discord
+- [ ] Test sending Email
+- [ ] Handle errors gracefully with user-friendly messages
+
+---
+
+## 4. Feedback Channels (Already Implemented - Enhancement Steps)
+
+### Current Status
+
+Feedback channels are already implemented as a global component following the correct pattern. However, we can enhance them:
+
+### Enhancement Steps
+
+#### Step 1: Add Missing Platform Implementations
+
+- [ ] Create `services/platforms/redditFeedbackService.ts`
+- [ ] Create `services/platforms/discordFeedbackService.ts`
+- [ ] Create `services/platforms/emailFeedbackService.ts`
+
+#### Step 2: Add Feedback Context (Optional Enhancement)
+
+**File**: `contexts/FeedbackContext.tsx` (optional, if you want global feedback state)
+
+```typescript
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { FeedbackItem } from '../types';
+import { fetchAllFeedback, FeedbackFetchOptions } from '../services/feedbackService';
+import { useConnections } from './ConnectionContext';
+
+interface FeedbackContextType {
+  items: FeedbackItem[];
+  loading: boolean;
+  error: string | null;
+  refresh: (options?: FeedbackFetchOptions) => Promise<void>;
+}
+
+const FeedbackContext = createContext<FeedbackContextType | undefined>(undefined);
+
+export const useFeedback = () => {
+  const context = useContext(FeedbackContext);
+  if (!context) {
+    throw new Error('useFeedback must be used within FeedbackProvider');
+  }
+  return context;
+};
+
+export const FeedbackProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { hasAnyConnection } = useConnections();
+  const [items, setItems] = useState<FeedbackItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = async (options?: FeedbackFetchOptions) => {
+    if (!hasAnyConnection()) {
+      setItems([]);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const feedback = await fetchAllFeedback(options);
+      setItems(feedback);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load feedback';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Auto-refresh when connections change
+  useEffect(() => {
+    refresh();
+  }, [hasAnyConnection()]);
+
+  return (
+    <FeedbackContext.Provider
+      value={{
+        items,
+        loading,
+        error,
+        refresh,
+      }}
+    >
+      {children}
+    </FeedbackContext.Provider>
+  );
+};
+```
+
+#### Step 3: Update FeedbackPanel to Use Context (Optional)
+
+If you create the FeedbackContext, update `FeedbackPanel.tsx` to use it:
+
+```typescript
+import { useFeedback } from '../contexts/FeedbackContext';
+
+// Replace local state with context
+const { items, loading, error, refresh } = useFeedback();
+```
+
+### Enhancement Checklist
+
+- [ ] Implement Reddit feedback service
+- [ ] Implement Discord feedback service
+- [ ] Implement Email feedback service
+- [ ] Add FeedbackContext (optional)
+- [ ] Update FeedbackPanel to use context (if context is added)
+- [ ] Add real-time updates via WebSocket/SSE (future enhancement)
+
+---
+
+## 5. Global Integration Steps
+
+### Step 1: Wrap App with All Context Providers
+
+**File**: `App.tsx`
+
+```typescript
+import { ConnectionProvider } from './contexts/ConnectionContext';
+import { InputChannelsProvider } from './contexts/InputChannelsContext';
+import { OutputChannelsProvider } from './contexts/OutputChannelsContext';
+import { FeedbackProvider } from './contexts/FeedbackContext'; // Optional
+
+return (
+  <ConnectionProvider>
+    <InputChannelsProvider>
+      <OutputChannelsProvider>
+        <FeedbackProvider> {/* Optional */}
+          {/* Your app components */}
+        </FeedbackProvider>
+      </OutputChannelsProvider>
+    </InputChannelsProvider>
+  </ConnectionProvider>
+);
+```
+
+### Step 2: Create Unified Channel Status Component
+
+**File**: `components/ChannelStatusPanel.tsx` (optional)
+
+A component that shows status of all channels in one place:
+
+```typescript
+import { useInputChannels } from '../contexts/InputChannelsContext';
+import { useConnections } from '../contexts/ConnectionContext';
+import { useFeedback } from '../contexts/FeedbackContext';
+
+const ChannelStatusPanel: React.FC = () => {
+  const { status: inputStatus, hasAnyActiveChannel } = useInputChannels();
+  const { connections } = useConnections();
+  const { items: feedbackItems } = useFeedback();
+
+  return (
+    <div>
+      {/* Show input channel status */}
+      {/* Show output channel connections */}
+      {/* Show feedback count */}
+    </div>
+  );
+};
+```
+
+### Step 3: File Structure Summary
+
+```
+services/
+  ├── inputChannelsService.ts          # Unified input channels service
+  ├── postingService.ts                 # Unified output channels service
+  ├── feedbackService.ts                # Unified feedback channels service ✅
+  ├── platforms/
+  │   ├── mcpInputService.ts            # MCP input implementation
+  │   ├── gitInputService.ts            # Git input implementation
+  │   ├── fileWatcherInputService.ts    # File watcher input implementation
+  │   ├── redditPostingService.ts       # Reddit posting implementation
+  │   ├── discordPostingService.ts      # Discord posting implementation
+  │   ├── emailPostingService.ts        # Email posting implementation
+  │   ├── xFeedbackService.ts           # X feedback implementation ✅
+  │   ├── redditFeedbackService.ts       # Reddit feedback implementation (TODO)
+  │   ├── discordFeedbackService.ts     # Discord feedback implementation (TODO)
+  │   └── emailFeedbackService.ts       # Email feedback implementation (TODO)
+
+contexts/
+  ├── ConnectionContext.tsx             # Connection status ✅
+  ├── InputChannelsContext.tsx          # Input channels context
+  ├── OutputChannelsContext.tsx         # Output channels context (optional)
+  └── FeedbackContext.tsx               # Feedback context (optional)
+
+components/
+  ├── InputChannelsSetupModal.tsx       # Input channels setup UI ✅
+  ├── DraftsPanel.tsx                   # Uses input/output channels
+  ├── FeedbackPanel.tsx                 # Uses feedback channels ✅
+  └── ChannelStatusPanel.tsx            # Unified status view (optional)
+```
+
+---
+
+## 6. Implementation Priority
+
+### Phase 1: Foundation (Current)
+- ✅ Feedback Channels (already implemented)
+- ✅ Connection Context (already implemented)
+- ✅ X OAuth and Posting (already implemented)
+
+### Phase 2: Input Channels
+1. Create `inputChannelsService.ts`
+2. Create platform-specific input services
+3. Create `InputChannelsContext`
+4. Integrate with `DraftsPanel`
+
+### Phase 3: Output Channels
+1. Create `postingService.ts`
+2. Create platform-specific posting services (Reddit, Discord, Email)
+3. Create `OutputChannelsContext` (optional)
+4. Update `DraftsPanel` to use unified service
+
+### Phase 4: Enhancements
+1. Complete missing feedback platform implementations
+2. Add real-time updates via WebSocket
+3. Add unified channel status panel
+4. Add error recovery and retry logic
+
+---
+
+## 7. Key Principles
+
+1. **Unified Interface**: All channel types expose a consistent interface
+2. **Platform Abstraction**: Platform-specific logic is isolated in `platforms/` folder
+3. **Context Providers**: Global state management via React Context
+4. **Error Handling**: Graceful degradation when platforms fail
+5. **Parallel Processing**: Fetch from multiple platforms simultaneously
+6. **Type Safety**: Strong TypeScript types for all channel events/data
+
+---
+
+## 8. Testing Strategy
+
+### Unit Tests
+- Test each platform service independently
+- Test unified service aggregation logic
+- Test error handling and fallbacks
+
+### Integration Tests
+- Test context providers
+- Test component integration
+- Test cross-platform scenarios
+
+### E2E Tests
+- Test full posting flow (draft → post → verify)
+- Test feedback fetching flow
+- Test input channel event flow
 
 ---
 
