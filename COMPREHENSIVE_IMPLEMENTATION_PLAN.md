@@ -14,9 +14,10 @@ This document combines all implementation plans, setup guides, and documentation
 6. [Electron Desktop App Setup](#electron-desktop-app-setup)
 7. [App Store & Play Store Distribution](#app-store--play-store-distribution)
 8. [Simulated Endpoints & Mock Data Analysis](#simulated-endpoints--mock-data-analysis)
-9. [Simulation Documentation](#simulation-documentation)
-10. [README](#readme)
-11. [Human Todo List](#human-todo-list)
+9. [AI Provider Setup (Firebase AI & Local)](#ai-provider-setup-firebase-ai--local)
+10. [Simulation Documentation](#simulation-documentation)
+11. [README](#readme)
+12. [Human Todo List](#human-todo-list)
 
 ---
 
@@ -2448,13 +2449,15 @@ This document catalogs all simulated endpoints, mock data, and fake behaviors th
 ### File: `services/geminiService.ts`
 
 #### `generateDraftContent()` - Demo Mode Fallback (Lines 37-47)
-- **Simulation**: When `apiKey` is missing, returns a fake response after 1500ms delay
+- **Simulation**: When no AI provider is configured (no Firebase, no local URL, no API key), returns a fake response after 1500ms delay
 - **Returns**: Hardcoded demo content: `"[DEMO MODE - NO API KEY]\n\nJust shipped ${context}.\n\nThe flow is feeling good. #buildinpublic"`
-- **Status**: ✅ **Real API call exists** when API key is present (uses Google GenAI SDK)
+- **Status**: ✅ **Real API call exists** when an AI provider is configured (see [AI Provider Setup](#ai-provider-setup-firebase-ai--local))
 - **Needs**: 
-  - Remove demo mode fallback
-  - Add proper error handling for missing API key
-  - Consider backend proxy for API key security
+  - Implement **Firebase AI (Gemini)** as primary cloud path (no API key in app; secure for distribution)
+  - Implement **Local (LM Studio / OpenAI-compatible)** option for user-configured base URL
+  - Unified `generateDraftContent` that delegates to the selected provider
+  - Demo mode only when neither Firebase nor local endpoint is configured
+  - Add proper error handling when provider is missing or request fails
 
 ---
 
@@ -2673,7 +2676,8 @@ This document catalogs all simulated endpoints, mock data, and fake behaviors th
 
 ## 8. Environment Variables Needed
 
-- `GEMINI_API_KEY` - ✅ Already configured
+- **AI (cloud)**: Firebase config only—no Gemini API key in the app. Use Firebase project config (e.g. `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_PROJECT_ID`, etc., or a single config object). The Gemini API key is managed by Firebase/Google Cloud and must not be committed or shipped.
+- **AI (local)**: Optional; can be user-configured in-app. If using env: `LOCAL_AI_BASE_URL` (e.g. `http://localhost:1234`), `LOCAL_AI_API_KEY` (optional, if the local server requires it).
 - `X_API_KEY` - Twitter/X API credentials
 - `X_API_SECRET` - Twitter/X API secret
 - `REDDIT_CLIENT_ID` - Reddit OAuth client ID
@@ -2697,12 +2701,65 @@ This document catalogs all simulated endpoints, mock data, and fake behaviors th
 
 ## 10. Security Considerations
 
-- Move API keys to backend (never expose in frontend)
+- **Cloud AI**: Use **Firebase AI** (not a raw Gemini API key in the app). The Gemini API key stays in Firebase/Google Cloud; do not add it to the codebase. Enable **Firebase App Check** (reCAPTCHA Enterprise for web, DeviceCheck/App Attest for iOS, Play Integrity for Android) to protect against abuse when distributing on web, iOS, Android, and desktop.
+- **Local AI**: When using the local (LM Studio / OpenAI-compatible) provider, no data leaves the user's network; optional API key is user-configured and stored locally if the local server requires it.
+- Move other API keys to backend (never expose in frontend)
 - Implement proper OAuth flows (never expose secrets)
 - Add authentication/authorization for API endpoints
 - Encrypt sensitive data in storage
 - Validate all user inputs
 - Rate limiting on API endpoints
+
+---
+
+# AI Provider Setup (Firebase AI & Local)
+
+Draft generation can use either a **cloud** provider (Firebase AI with Gemini) for secure distribution or a **local** provider (LM Studio or any OpenAI-compatible endpoint on the user's machine or LAN). The app exposes a single `generateDraftContent` entry point that delegates to the selected provider.
+
+```mermaid
+flowchart LR
+  DraftUI[Drafts Panel] --> Gen[generateDraftContent]
+  Gen --> Provider{AI Provider}
+  Provider -->|Cloud| Firebase[Firebase AI Logic]
+  Provider -->|Local| Local[OpenAI-compatible endpoint]
+  Firebase --> Gemini[Gemini API]
+  Local --> LM[LM Studio or LAN server]
+```
+
+## Firebase AI (Gemini) – Recommended for distribution
+
+Use Firebase AI Logic so the Gemini API key is never embedded in the app. This is the recommended cloud path for distributing BRICK on web, iOS, Android, and desktop.
+
+### Setup
+
+1. **Firebase project**: Create or use an existing Firebase project. In the [Firebase Console](https://console.firebase.google.com/), go to **Firebase AI Logic** and click **Get started**. Choose **Gemini Developer API** (or Vertex AI if you prefer billing there). The console will create a Gemini API key in the project—**do not add this key to your app codebase**; Firebase manages it.
+2. **SDK**: Add the Firebase SDK (Web: `npm install firebase`). Use Firebase AI Logic from `firebase/ai`: `getAI`, `getGenerativeModel`, `GoogleAIBackend`. Initialize with your app's Firebase config only (e.g. `VITE_FIREBASE_*` or a config object). Use a supported model name (e.g. `gemini-2.5-flash` or the current plan default; note [Gemini 2.0 Flash deprecation](https://firebase.google.com/docs/ai-logic/faq-and-troubleshooting#discontinued-models) and prefer newer models).
+3. **Structured output**: Keep the same `generateDraftContent` contract (title + content). Use [Firebase AI structured output](https://firebase.google.com/docs/ai-logic/generate-structured-output) (e.g. JSON with title and content) so the response shape matches the existing UI.
+4. **Production**: Enable [Firebase App Check](https://firebase.google.com/docs/ai-logic/app-check) for your platforms (reCAPTCHA Enterprise for web, DeviceCheck/App Attest for iOS, Play Integrity for Android). Optionally use [Firebase Remote Config](https://firebase.google.com/docs/ai-logic/change-model-name-remotely) to change the model name without shipping an app update.
+
+### Implementation
+
+- Refactor `services/geminiService.ts` (or add `services/firebaseAiService.ts`) so that when the **Firebase AI** provider is selected, the app uses the Firebase AI Logic SDK (e.g. `model.generateContent(...)`) instead of `GoogleGenAI` with an API key. Same prompt and structured output (title + content) as today.
+
+## Local (LM Studio / OpenAI-compatible)
+
+Users can use a model running on their machine or on a LAN server (e.g. [LM Studio](https://lmstudio.ai/docs/developer/openai-compat)) without sending code to the cloud.
+
+### Behavior
+
+- **Endpoint**: Configurable base URL, e.g. `http://localhost:1234` (LM Studio default) or `http://192.168.x.x:1234` for a machine on the local network.
+- **Protocol**: [OpenAI-compatible REST API](https://lmstudio.ai/docs/developer/openai-compat) (e.g. `POST /v1/chat/completions` or `/v1/completions`). No API key required for typical LM Studio local use; optional API key if the local server requires it.
+- **Config**: User-facing settings: "Local AI base URL" and optional "Local AI API key". These can be stored in app preferences or env (e.g. `LOCAL_AI_BASE_URL`, `LOCAL_AI_API_KEY`).
+- **Request**: Send the same prompt/context (platform, context, code snippet, tone) as the message content. Ask the model to respond with JSON `{ "title": "...", "content": "..." }` when possible.
+- **Response**: Parse the reply into `{ title?, content }`. If the local model doesn't support strict JSON, use best-effort parse or a content-only fallback.
+
+### Implementation
+
+- **Local AI client**: Add `services/localAiService.ts` (or integrate into a unified `draftGenerationService.ts`) that takes base URL and optional API key, calls `/v1/chat/completions` (or equivalent), sends the same prompt text used for Gemini, and maps the reply to `GeneratedContent`.
+- **Provider selection**: In Settings (or onboarding), let the user choose:
+  - **Firebase AI (Gemini)** – default for distributed builds.
+  - **Local (LM Studio / OpenAI-compatible)** – user enters base URL and optional key.
+- **Unified entry point**: `generateDraftContent` delegates to Firebase AI or Local based on the current provider so `DraftsPanel` and other callers remain unchanged.
 
 ---
 
@@ -2724,9 +2781,9 @@ This document outlines all hardcoded data, simulated behaviors, and visual place
 ## 2. Service Layer Simulations
 **File:** `services/geminiService.ts`
 
-*   **API Key Fallback / Demo Mode**:
-    *   The service checks for `process.env.API_KEY`.
-    *   **Simulation**: If the key is missing (which is the default state in some preview environments), the `generateDraftContent` function returns a promise that resolves after **1500ms**.
+*   **AI Provider Fallback / Demo Mode**:
+    *   The app supports two real AI backends: **Firebase AI (Gemini)** for secure cloud use and **Local (LM Studio / OpenAI-compatible)** for on-device or LAN endpoints. When neither is configured (no Firebase, no local base URL, no legacy API key), the service runs in demo mode.
+    *   **Simulation**: If no provider is configured, `generateDraftContent` returns a promise that resolves after **1500ms**.
     *   **Return Value**: It returns a hardcoded "DEMO MODE" draft object:
         ```json
         {
@@ -2734,6 +2791,7 @@ This document outlines all hardcoded data, simulated behaviors, and visual place
           "content": "[DEMO MODE - NO API KEY]\n\nJust shipped [Context].\n\nThe flow is feeling good. #buildinpublic"
         }
         ```
+    *   **Production**: Use Firebase AI (no API key in app) for distribution, or let users configure a local AI base URL (e.g. LM Studio). Demo mode is only for preview when neither is set up.
 
 ## 3. Component Behavior Simulations
 
@@ -2776,12 +2834,12 @@ This document outlines all hardcoded data, simulated behaviors, and visual place
 **Code. Share. Listen.**  
 *A brutalist, flow-preserving tool for building in public directly from your IDE.*
 
-DevFlow Studio is a developer-first dashboard designed to reduce the friction of "building in public." By connecting directly to your development environment via the Model Context Protocol (MCP), it observes your coding activity and uses Google's Gemini models to draft social media updates, changelogs, and technical posts automatically.
+DevFlow Studio is a developer-first dashboard designed to reduce the friction of "building in public." By connecting directly to your development environment via the Model Context Protocol (MCP), it observes your coding activity and uses AI (Firebase AI with Gemini for secure distribution, or a local endpoint like LM Studio) to draft social media updates, changelogs, and technical posts automatically.
 
 ## ⚡ Features
 
 *   **Brutalist Aesthetics**: High-contrast, keyboard-centric UI designed for dark mode environments.
-*   **Context-Aware Drafting**: Uses `gemini-3-flash` to analyze code snippets and generate platform-specific posts (X/Twitter threads, Reddit posts).
+*   **Context-Aware Drafting**: Uses configurable AI—Firebase AI (Gemini) for secure cloud drafting or a local OpenAI-compatible endpoint (e.g. LM Studio)—to analyze code snippets and generate platform-specific posts (X/Twitter threads, Reddit posts).
 *   **Tone Calibration**: Train the AI on your previous posts to mimic your specific writing style and vocabulary.
 *   **Unified Feedback Loop**: Aggregates comments, bug reports, and feature requests from social platforms into a single stream.
 *   **Privacy-First Design**: Local processing of drafts with explicit "Post" confirmation.
@@ -2791,7 +2849,7 @@ DevFlow Studio is a developer-first dashboard designed to reduce the friction of
 *   **Frontend**: React 19
 *   **Styling**: Tailwind CSS
 *   **Icons**: Lucide React
-*   **AI**: Google GenAI SDK (`@google/genai`)
+*   **AI**: Firebase AI (Gemini) for secure distribution, or local OpenAI-compatible endpoint (e.g. LM Studio). No API key in app when using Firebase.
 *   **Font**: JetBrains Mono
 
 ## 🚀 Getting Started
@@ -2800,8 +2858,8 @@ DevFlow Studio is a developer-first dashboard designed to reduce the friction of
     *(Note: This is a web preview, dependencies are loaded via ESM in `index.html`)*
 
 2.  **Environment Setup**
-    The app uses the Google Gemini API. In a real environment, `process.env.API_KEY` would be injected.
-    *   *Demo Mode*: If no key is found, the app simulates API responses for testing UI flow.
+    The app uses either Firebase AI (Gemini)—no API key in the app—or a local OpenAI-compatible endpoint (e.g. LM Studio). Configure Firebase or set a local AI base URL in settings.
+    *   *Demo Mode*: If no AI provider is configured, the app simulates API responses for testing UI flow.
 
 3.  **Run Application**
     Launch the development server to view the studio.
@@ -2825,7 +2883,7 @@ This version of DevFlow Studio runs in a browser environment without a backend.
 See [SIMULATION_DOCUMENTATION.txt](./SIMULATION_DOCUMENTATION.txt) for a detailed list of mocked behaviors, including:
 *   Simulated MCP Connection latency.
 *   Hardcoded social media feedback.
-*   Mocked AI generation when API keys are absent.
+*   Mocked AI generation when no AI provider is configured (no Firebase, no local endpoint).
 
 ---
 
