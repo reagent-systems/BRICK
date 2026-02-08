@@ -318,6 +318,51 @@ export function clearUserProfileCache(): void {
 }
 
 /**
+ * Fetch the authenticated user's recent tweets for tone calibration.
+ * Returns an array of tweet text strings.
+ */
+export async function fetchRecentTweets(count: number = 20): Promise<string[]> {
+  const accessToken = await ensureValidXToken();
+
+  // First get the user ID
+  const profile = await getXUserProfile();
+  const userId = profile.data?.id;
+  if (!userId) {
+    throw new Error('Could not determine user ID');
+  }
+
+  // Fetch recent tweets (exclude replies and retweets for cleaner tone data)
+  const params = new URLSearchParams({
+    'max_results': Math.min(count, 100).toString(),
+    'exclude': 'replies,retweets',
+    'tweet.fields': 'created_at,text',
+  });
+
+  const response = await fetch(`${getApiUrl(`/2/users/${userId}/tweets`)}?${params.toString()}`, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error('X API rate limit reached. The free tier allows very few reads per 15 minutes. Wait a bit and try again.');
+    }
+    const error = await response.text();
+    throw new Error(`Failed to fetch tweets: ${error}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.data || !Array.isArray(data.data)) {
+    return [];
+  }
+
+  // Return just the text of each tweet
+  return data.data.map((tweet: { text: string }) => tweet.text);
+}
+
+/**
  * Upload media to X (images, videos, etc.)
  * Returns media_id that can be used in postTweet
  */

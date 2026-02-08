@@ -6,6 +6,7 @@ import { getMcpStatus, isMcpAvailable, type McpStatus } from '../services/mcpSer
 import { getGitStatus, isGitAvailable, type GitStatus } from '../services/gitWatcherService';
 import { getWatcherStatus, isWatcherAvailable, type WatcherStatus } from '../services/fileWatcherService';
 import { getApiKey, setApiKey, hasApiKey } from '../services/geminiService';
+import { fetchRecentTweets, isXConnected } from '../services/xOAuthService';
 
 interface SettingsPanelProps {
   toneContext: string;
@@ -45,14 +46,36 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneConte
     return () => clearInterval(interval);
   }, []);
 
-  const handleSimulateImport = () => {
-    const mockPreviousPosts = 
-`1. "Just pushed a fix for the memory leak. Rust ownership rules are a harsh mistress but fair."
-2. "Shipping the brutalist redesign today. No gradients, just vibes."
-3. "Why does CSS Grid always save the day?"`;
-    
-    setToneContext(mockPreviousPosts);
-    setAnalyzed(false);
+  const [importing, setImporting] = useState(false);
+
+  const handleImportFromX = async () => {
+    setImporting(true);
+    try {
+      const connected = await isXConnected();
+      if (!connected) {
+        alert('Connect your X account first (Outbound Channels).');
+        return;
+      }
+
+      const tweets = await fetchRecentTweets(20);
+      if (tweets.length === 0) {
+        alert('No tweets found on your account to import.');
+        return;
+      }
+
+      // Format tweets as numbered list for the tone context
+      const formatted = tweets
+        .map((text, i) => `${i + 1}. "${text}"`)
+        .join('\n');
+
+      setToneContext(formatted);
+      setAnalyzed(false);
+    } catch (error) {
+      console.error('Failed to import tweets:', error);
+      alert(`Failed to import: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleAnalyze = () => {
@@ -227,10 +250,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneConte
               />
               <div className="flex justify-between items-center mt-3">
                  <button 
-                   onClick={handleSimulateImport}
-                   className="flex items-center gap-2 text-[9px] text-df-gray hover:text-df-white uppercase font-bold"
+                   onClick={handleImportFromX}
+                   disabled={importing}
+                   className={`flex items-center gap-2 text-[9px] uppercase font-bold transition-colors ${
+                     importing ? 'text-df-orange cursor-wait' : 'text-df-gray hover:text-df-white'
+                   }`}
                  >
-                    <Upload size={10} /> Import from X History
+                    <Upload size={10} className={importing ? 'animate-pulse' : ''} /> 
+                    {importing ? 'Importing...' : 'Import from X History'}
                  </button>
                  <button 
                     onClick={handleAnalyze}
