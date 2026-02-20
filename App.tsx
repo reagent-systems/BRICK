@@ -1,12 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Activity, Settings, ShieldCheck, Square } from 'lucide-react';
 import DraftsPanel from './components/DraftsPanel';
 import FeedbackPanel from './components/FeedbackPanel';
 import SettingsPanel from './components/SettingsPanel';
 import Onboarding from './components/Onboarding';
 import InputChannelsSetup from './components/InputChannelsSetupModal';
-import CreditTopUpModal from './components/CreditTopUpModal';
 import { Platform, InputEvent } from './types';
 import { handleOAuthCallback } from './services/oauthService';
 import { ConnectionProvider } from './contexts/ConnectionContext';
@@ -16,6 +15,9 @@ import { onMcpProgress, isMcpAvailable } from './services/mcpServerService';
 import { onGitCommit, isGitAvailable } from './services/gitWatcherService';
 import { onFileChange, isWatcherAvailable } from './services/fileWatcherService';
 import { subscribeToCredits } from './services/creditService';
+import { isFirebaseConfigured } from './services/firebaseConfig';
+
+const CreditTopUpModal = lazy(() => import('./components/CreditTopUpModal'));
 
 export type ActivityTab = 'devflow' | 'settings';
 
@@ -30,7 +32,9 @@ const App: React.FC = () => {
   const [activePlatform, setActivePlatform] = useState<Platform>(Platform.X);
   // Input channel events → triggers draft generation in DraftsPanel
   const [triggerEvent, setTriggerEvent] = useState<InputEvent | null>(null);
-  const [isIdeConnected, setIsIdeConnected] = useState(false);
+  const [isIdeConnected, setIsIdeConnected] = useState(() => {
+    return localStorage.getItem('ide_connected') === 'true';
+  });
   
   // State for AI Voice Calibration
   const [toneContext, setToneContext] = useState<string>('');
@@ -41,8 +45,9 @@ const App: React.FC = () => {
   const [showTopUp, setShowTopUp] = useState(false);
   const [topUpReason, setTopUpReason] = useState<string | undefined>();
 
+  // Only subscribe to credits when Firebase is configured AND user is signed in
   useEffect(() => {
-    if (!isAuthenticated || !user) {
+    if (!isFirebaseConfigured() || !isAuthenticated || !user) {
       setCredits(0);
       return;
     }
@@ -50,11 +55,20 @@ const App: React.FC = () => {
   }, [isAuthenticated, user]);
 
   // ── Input Channel Listeners ──────────────────────────────────────────────
+  // Helper: when any input event arrives, also mark IDE as connected
+  const handleInputEvent = (event: InputEvent) => {
+    setTriggerEvent(event);
+    if (!isIdeConnected) {
+      setIsIdeConnected(true);
+      localStorage.setItem('ide_connected', 'true');
+    }
+  };
+
   // MCP: coding agent sends log_progress
   useEffect(() => {
     if (!isMcpAvailable()) return;
     return onMcpProgress((event) => {
-      setTriggerEvent({
+      handleInputEvent({
         source: 'mcp',
         context: event.summary,
         timestamp: Date.now(),
@@ -66,7 +80,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isGitAvailable()) return;
     return onGitCommit((event) => {
-      setTriggerEvent({
+      handleInputEvent({
         source: 'git',
         context: `Commit on ${event.branch}: ${event.commit.message}`,
         codeSnippet: event.diff,
@@ -80,11 +94,11 @@ const App: React.FC = () => {
     if (!isWatcherAvailable()) return;
     return onFileChange((event) => {
       const fileList = event.files
-        .filter(f => !f.sensitive)
+        .filter((f: any) => !f.sensitive)
         .slice(0, 10)
-        .map(f => f.path)
+        .map((f: any) => f.path)
         .join('\n');
-      setTriggerEvent({
+      handleInputEvent({
         source: 'watcher',
         context: event.summary,
         codeSnippet: fileList || undefined,
@@ -94,7 +108,14 @@ const App: React.FC = () => {
   }, []);
 
   // Auto-open top-up modal when a credit gate rejects an action
+  // Only listen when paid channels are actually connected
   useEffect(() => {
+    const hasPaidChannel =
+      !!localStorage.getItem('oauth_tokens_x') ||
+      !!localStorage.getItem('oauth_tokens_reddit') ||
+      !!localStorage.getItem('oauth_tokens_discord');
+    if (!hasPaidChannel) return;
+
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       setTopUpReason(detail?.reason || 'You need credits to complete this action.');
@@ -397,6 +418,7 @@ const App: React.FC = () => {
           onClose={() => setView('main')}
           onComplete={() => {
             setIsIdeConnected(true);
+            localStorage.setItem('ide_connected', 'true');
             setView('main');
           }}
         />
@@ -419,16 +441,8 @@ const App: React.FC = () => {
         {/* Vertical Credit Meter - click opens top-up modal or settings */}
         <div 
           onClick={() => {
-            const hasPaidChannel =
-              !!localStorage.getItem('oauth_tokens_x') ||
-              !!localStorage.getItem('oauth_tokens_reddit') ||
-              !!localStorage.getItem('oauth_tokens_discord');
-            if (hasPaidChannel) {
-              setTopUpReason(undefined);
-              setShowTopUp(true);
-            } else {
-              setActiveActivity('settings');
-            }
+            setTopUpReason(undefined);
+            setShowTopUp(true);
           }}
           title={`${credits} CR — click to top up`}
           className="flex-grow w-full flex flex-col items-center justify-center py-4 px-2 group cursor-pointer"
@@ -476,11 +490,15 @@ const App: React.FC = () => {
       </div>
     </div>
       )}
-      <CreditTopUpModal
-        isOpen={showTopUp}
-        onClose={() => setShowTopUp(false)}
-        reason={topUpReason}
-      />
+      {showTopUp && (
+        <Suspense fallback={null}>
+          <CreditTopUpModal
+            isOpen={showTopUp}
+            onClose={() => setShowTopUp(false)}
+            reason={topUpReason}
+          />
+        </Suspense>
+      )}
     </ConnectionProvider>
     </AuthProvider>
   );

@@ -24,12 +24,17 @@ const CreditSection: React.FC<{ onOpenTopUp?: () => void }> = ({ onOpenTopUp }) 
   const needsCreditsForAI = !hasApiKey() && isFirebaseConfigured();
 
   useEffect(() => {
-    if (!isAuthenticated || !user) {
+    if (!isFirebaseConfigured() || !isAuthenticated || !user) {
       setCredits(0);
       return;
     }
     return subscribeToCredits(user.uid, setCredits);
   }, [isAuthenticated, user]);
+
+  // Don't show credits section if no paid channels and user has own AI key
+  if (!hasPaidChannel && !needsCreditsForAI) {
+    return null;
+  }
 
   return (
     <section>
