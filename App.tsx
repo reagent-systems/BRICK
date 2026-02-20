@@ -6,13 +6,16 @@ import FeedbackPanel from './components/FeedbackPanel';
 import SettingsPanel from './components/SettingsPanel';
 import Onboarding from './components/Onboarding';
 import InputChannelsSetup from './components/InputChannelsSetupModal';
+import CreditTopUpModal from './components/CreditTopUpModal';
 import { Platform, InputEvent } from './types';
 import { handleOAuthCallback } from './services/oauthService';
 import { ConnectionProvider } from './contexts/ConnectionContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { isElectron, isNativePlatform } from './utils/platform';
 import { onMcpProgress, isMcpAvailable } from './services/mcpServerService';
 import { onGitCommit, isGitAvailable } from './services/gitWatcherService';
 import { onFileChange, isWatcherAvailable } from './services/fileWatcherService';
+import { subscribeToCredits } from './services/creditService';
 
 export type ActivityTab = 'devflow' | 'settings';
 
@@ -32,8 +35,18 @@ const App: React.FC = () => {
   // State for AI Voice Calibration
   const [toneContext, setToneContext] = useState<string>('');
   
-  // State for Credits
-  const [credits] = useState(85);
+  // Credits: real-time from Firestore when authenticated, 0 otherwise
+  const { user, isAuthenticated } = useAuth();
+  const [credits, setCredits] = useState(0);
+  const [showTopUp, setShowTopUp] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      setCredits(0);
+      return;
+    }
+    return subscribeToCredits(user.uid, (c) => setCredits(c));
+  }, [isAuthenticated, user]);
 
   // ── Input Channel Listeners ──────────────────────────────────────────────
   // MCP: coding agent sends log_progress
@@ -280,6 +293,8 @@ const App: React.FC = () => {
             setToneContext={setToneContext}
             onNavigateToOnboarding={handleNavigateToOnboarding}
             onOpenInputChannels={() => setView('setup')}
+            onOpenTopUp={() => setShowTopUp(true)}
+            credits={credits}
           />
         );
         
@@ -356,6 +371,7 @@ const App: React.FC = () => {
   };
 
   return (
+    <AuthProvider>
     <ConnectionProvider>
       {view === 'onboarding' ? (
         <div className="h-screen w-screen bg-black font-mono overflow-hidden">
@@ -388,12 +404,16 @@ const App: React.FC = () => {
           </div>
         </button>
 
-        {/* Vertical Credit Meter - Wider (w-8) within the w-12 sidebar */}
-        <div className="flex-grow w-full flex flex-col items-center justify-center py-4 px-2 group cursor-help">
-          <div className="w-8 h-full bg-black border border-df-border relative overflow-hidden flex flex-col justify-end shadow-inner">
+        {/* Vertical Credit Meter - always opens settings */}
+        <div 
+          onClick={() => setActiveActivity('settings')}
+          title={isAuthenticated ? `${credits} credits` : 'Sign in to get credits'}
+          className="flex-grow w-full flex flex-col items-center justify-center py-4 px-2 group cursor-pointer"
+        >
+          <div className="w-8 h-full bg-black border border-df-border relative overflow-hidden flex flex-col justify-end shadow-inner group-hover:border-df-orange transition-colors">
             <div 
               className="bg-df-orange w-full transition-all duration-1000 ease-in-out" 
-              style={{ height: `${credits}%` }}
+              style={{ height: `${Math.min((credits / 200) * 100, 100)}%` }}
             ></div>
             {/* Meter Grid Overlay: 16 lines = 15 gaps/squares */}
             <div className="absolute inset-0 flex flex-col justify-between py-0 opacity-25 pointer-events-none">
@@ -433,7 +453,13 @@ const App: React.FC = () => {
       </div>
     </div>
       )}
+      <CreditTopUpModal 
+        isOpen={showTopUp} 
+        onClose={() => setShowTopUp(false)} 
+        currentCredits={credits} 
+      />
     </ConnectionProvider>
+    </AuthProvider>
   );
 };
 

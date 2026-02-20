@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users can only read/write their own document
+    match /users/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      // Prevent users from modifying their own credits directly
+      // (credits are modified via Cloud Functions / server-side transactions)
+      allow update: if request.auth != null 
+        && request.auth.uid == userId
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['credits', 'totalCreditsUsed', 'stripeCustomerId']));
+    }
+
+    // Users can read their own transactions, but only Cloud Functions can write
+    match /users/{userId}/transactions/{txId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false; // Only Cloud Functions (admin SDK) can write
+    }
+
+    // Pricing config is readable by all authenticated users
+    match /config/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Admin only
+    }
+  }
+}

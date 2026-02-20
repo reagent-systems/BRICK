@@ -1,21 +1,26 @@
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Zap, Globe, Cpu, Link, Lock, EyeOff, Mic, Upload, Check, RefreshCw, Layers, Server, GitBranch, Folder, RotateCcw, Eye, EyeOff as EyeOffIcon, Key } from 'lucide-react';
+import { Shield, Zap, Globe, Cpu, Link, Lock, EyeOff, Mic, Upload, Check, RefreshCw, Layers, Server, GitBranch, Folder, RotateCcw, Eye, EyeOff as EyeOffIcon, Key, User, LogOut, LogIn } from 'lucide-react';
 import { useConnections } from '../contexts/ConnectionContext';
+import { useAuth } from '../contexts/AuthContext';
 import { getMcpStatus, isMcpAvailable, type McpStatus } from '../services/mcpServerService';
 import { getGitStatus, isGitAvailable, type GitStatus } from '../services/gitWatcherService';
 import { getWatcherStatus, isWatcherAvailable, type WatcherStatus } from '../services/fileWatcherService';
 import { getApiKey, setApiKey, hasApiKey } from '../services/geminiService';
 import { fetchRecentTweets, isXConnected } from '../services/xOAuthService';
+import { signInWithGoogle, signInWithEmail, signUpWithEmail, signOut } from '../services/authService';
+import { isFirebaseConfigured } from '../services/firebaseConfig';
 
 interface SettingsPanelProps {
   toneContext: string;
   setToneContext: (s: string) => void;
   onNavigateToOnboarding?: () => void;
   onOpenInputChannels?: () => void;
+  onOpenTopUp?: () => void;
+  credits?: number;
 }
 
-const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneContext, onNavigateToOnboarding, onOpenInputChannels }) => {
+const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneContext, onNavigateToOnboarding, onOpenInputChannels, onOpenTopUp, credits = 0 }) => {
   const { connections } = useConnections();
   const [analyzed, setAnalyzed] = useState(false);
   const [protocols, setProtocols] = useState({
@@ -102,6 +107,50 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneConte
     alert('Local cache cleared. Tokens and saved state have been removed.');
   };
 
+  // Auth
+  const { user, isAuthenticated } = useAuth();
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const handleEmailAuth = async () => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      if (authMode === 'signup') {
+        await signUpWithEmail(authEmail, authPassword);
+      } else {
+        await signInWithEmail(authEmail, authPassword);
+      }
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Authentication failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Google sign-in failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (err) {
+      console.error('Sign out error:', err);
+    }
+  };
+
   const inboundActive = mcpStatus.running || gitStatus.watching || watcherStatus.folders.length > 0;
 
   return (
@@ -111,6 +160,101 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneConte
       </div>
 
       <div className="flex-grow overflow-y-auto p-4 space-y-8">
+
+        {/* ACCOUNT SECTION */}
+        {isFirebaseConfigured() && (
+        <section>
+          <h3 className="text-[10px] font-bold text-df-orange uppercase mb-4 flex items-center gap-2">
+            <User size={12} /> ACCOUNT
+          </h3>
+          {isAuthenticated && user ? (
+            <div className="bg-[#111] border border-df-border p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-df-white font-bold">{user.displayName || 'User'}</div>
+                  <div className="text-[9px] text-df-gray">{user.email}</div>
+                </div>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-1 text-[9px] text-df-gray hover:text-red-400 uppercase font-bold transition-colors"
+                >
+                  <LogOut size={10} /> Sign Out
+                </button>
+              </div>
+              {/* Credits display + top up */}
+              <div className="flex items-center justify-between pt-2 border-t border-df-border">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-lg font-black text-df-white">{credits}</span>
+                  <span className="text-[10px] font-bold text-df-orange">CR</span>
+                </div>
+                <button
+                  onClick={onOpenTopUp}
+                  className="px-3 py-1.5 bg-df-orange text-df-black text-[10px] font-bold uppercase hover:bg-white transition-colors"
+                >
+                  TOP UP
+                </button>
+              </div>
+              <div className="text-[9px] text-df-gray">
+                Credits cover AI drafting, posting to X, and feedback fetching. Free APIs (email, local tools) don't use credits.
+              </div>
+            </div>
+          ) : (
+            <div className="bg-[#111] border border-df-border p-3 space-y-3">
+              <p className="text-[9px] text-df-gray">
+                Sign in to sync credits across devices and use BRICK AI without your own API key.
+              </p>
+              {authError && (
+                <div className="text-[9px] text-red-400 bg-red-900/20 border border-red-700/30 p-2">
+                  {authError}
+                </div>
+              )}
+              <button
+                onClick={handleGoogleAuth}
+                disabled={authLoading}
+                className="w-full py-2 bg-df-white text-black text-[10px] font-bold uppercase hover:bg-df-orange transition-colors flex items-center justify-center gap-2"
+              >
+                <LogIn size={12} /> Sign in with Google
+              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex-grow h-px bg-df-border" />
+                <span className="text-[8px] text-df-gray uppercase">or</span>
+                <div className="flex-grow h-px bg-df-border" />
+              </div>
+              <div className="space-y-2">
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="Email"
+                  className="w-full bg-black border border-df-border text-xs text-df-white p-2 outline-none focus:border-df-orange transition-colors font-mono"
+                />
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="Password"
+                  className="w-full bg-black border border-df-border text-xs text-df-white p-2 outline-none focus:border-df-orange transition-colors font-mono"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleEmailAuth}
+                    disabled={authLoading || !authEmail || !authPassword}
+                    className="flex-grow py-2 bg-df-white text-black text-[10px] font-bold uppercase hover:bg-df-orange transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {authLoading ? '...' : authMode === 'signup' ? 'SIGN UP' : 'SIGN IN'}
+                  </button>
+                </div>
+                <button
+                  onClick={() => setAuthMode(m => m === 'signin' ? 'signup' : 'signin')}
+                  className="text-[9px] text-df-gray hover:text-df-orange transition-colors"
+                >
+                  {authMode === 'signin' ? 'Need an account? Sign up' : 'Already have an account? Sign in'}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+        )}
 
         {/* INBOUND CHANNELS SECTION */}
         <section>
