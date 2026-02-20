@@ -11,14 +11,17 @@ import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
 // ─── Firebase Config ─────────────────────────────────────────────────────────
-// TODO: Replace with your actual Firebase config from the Firebase Console
+// These are client-side identifiers (safe to be public / committed to repo).
+// Security is enforced by Firebase Security Rules and App Check, not by
+// hiding these values.
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+  apiKey: "AIzaSyB1YwnIORwNFiTDg5wF2xO0tVOvlG6MYDA",
+  authDomain: "gen-lang-client-0512464630.firebaseapp.com",
+  projectId: "gen-lang-client-0512464630",
+  storageBucket: "gen-lang-client-0512464630.firebasestorage.app",
+  messagingSenderId: "953043772323",
+  appId: "1:953043772323:web:78c6c55199592af5c5b016",
+  measurementId: "G-6WF9CSPVL8",
 };
 
 // ─── Initialization (singleton) ──────────────────────────────────────────────
