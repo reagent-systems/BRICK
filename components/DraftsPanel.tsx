@@ -117,24 +117,39 @@ const DraftsPanel: React.FC<DraftsPanelProps> = ({ activePlatform, setActivePlat
   const handleGenerate = async (context: string, codeSnippet?: string) => {
     // If ALL is selected, default to X for generation
     const targetPlatform = activePlatform === Platform.ALL ? Platform.X : activePlatform;
-    
+
     setIsGenerating(true);
     setCurrentDraft(null); // Clear previous draft visual immediately
-    
-    const result = await generateDraftContent(targetPlatform, context, codeSnippet, toneContext);
-    
-    const newDraft: Draft = {
-      id: Date.now().toString(),
-      timestamp: Date.now(),
-      platform: targetPlatform,
-      content: result.content,
-      title: result.title,
-      mediaUrl: "placeholder",
-      posted: false,
-    };
 
-    setCurrentDraft(newDraft);
-    setIsGenerating(false);
+    try {
+      const result = await generateDraftContent(targetPlatform, context, codeSnippet, toneContext);
+
+      const newDraft: Draft = {
+        id: Date.now().toString(),
+        timestamp: Date.now(),
+        platform: targetPlatform,
+        content: result?.content ?? 'No content generated.',
+        title: result?.title,
+        mediaUrl: "placeholder",
+        posted: false,
+      };
+
+      setCurrentDraft(newDraft);
+    } catch (err) {
+      console.error('[DraftsPanel] Generate failed:', err);
+      const message = err instanceof Error ? err.message : 'Generation failed';
+      setCurrentDraft({
+        id: Date.now().toString(),
+        timestamp: Date.now(),
+        platform: targetPlatform,
+        content: `[Error] ${message}`,
+        title: 'Error generating draft',
+        mediaUrl: "placeholder",
+        posted: false,
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handlePost = async () => {
