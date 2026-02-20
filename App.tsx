@@ -334,88 +334,38 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    switch (activeActivity) {
-      case 'settings':
-        return (
-          <SettingsPanel 
-            toneContext={toneContext} 
-            setToneContext={setToneContext}
-            onNavigateToOnboarding={handleNavigateToOnboarding}
-            onOpenInputChannels={() => setView('setup')}
-            onOpenTopUp={() => { setTopUpReason(undefined); setShowTopUp(true); }}
-          />
-        );
-        
-      case 'devflow':
-      default:
-        if (!isIdeConnected) {
-          return (
-            <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-df-black animate-in fade-in duration-300">
-              <h2 className="text-df-white font-bold text-sm mb-2 uppercase tracking-tighter">DISCONNECTED</h2>
-              <p className="text-df-gray text-[10px] leading-relaxed mb-8 max-w-xs mx-auto">
-                BRICK needs to be initialized.
-              </p>
-              <button 
-                onClick={() => {
-                  setView('setup');
-                }}
-                className="w-full max-w-xs py-3 bg-df-orange text-df-black font-bold text-xs hover:bg-white transition-colors uppercase border border-df-orange"
-              >
-                Establish Link
-              </button>
-            </div>
-          );
-        }
-        return (
-          <div className="flex flex-col h-full animate-in fade-in duration-200">
-            {/* Mobile/Tablet Tabs - Hidden on Desktop */}
-            <div className={`flex border-b border-df-border bg-df-black shrink-0 lg:hidden ${isIdeConnected ? 'pt-[env(safe-area-inset-top,44px)] lg:pt-0 min-h-[48px]' : 'h-12'}`}>
-              <button 
-                onClick={() => setActiveTab('drafts')}
-                className={`flex-1 text-xs font-bold tracking-wider hover:bg-[#111] transition-colors flex items-center justify-center ${activeTab === 'drafts' ? 'text-df-white border-b-4 border-df-orange py-2' : 'text-df-gray py-2 border-b-4 border-transparent'}`}
-              >
-                DRAFTS
-              </button>
-              <button 
-                onClick={() => setActiveTab('feedback')}
-                className={`flex-1 text-xs font-bold tracking-wider hover:bg-[#111] transition-colors flex items-center justify-center ${activeTab === 'feedback' ? 'text-df-white border-b-4 border-df-orange py-2' : 'text-df-gray py-2 border-b-4 border-transparent'}`}
-              >
-                FEEDBACK
-              </button>
-            </div>
-
-            {/* Content Area - Responsive Grid */}
-            <div className="flex-grow overflow-hidden relative flex flex-col lg:flex-row">
-              {/* Left Column (Drafts) */}
-              <div className={`flex-grow h-full lg:w-1/2 lg:border-r border-df-border ${activeTab === 'drafts' ? 'block' : 'hidden lg:block'}`}>
-                 {/* Desktop Header */}
-                 <div className="hidden lg:flex h-10 border-b border-df-border items-center px-4 bg-df-black shrink-0">
-                    <span className="text-xs font-bold text-df-white tracking-wider">DRAFTS</span>
-                 </div>
-                 <div className="h-full lg:h-[calc(100%-40px)]">
-                    <DraftsPanel 
-                      activePlatform={activePlatform} 
-                      setActivePlatform={setActivePlatform} 
-                      triggerEvent={triggerEvent}
-                      toneContext={toneContext}
-                    />
-                 </div>
-              </div>
-
-              {/* Right Column (Feedback) */}
-              <div className={`flex-grow h-full lg:w-1/2 ${activeTab === 'feedback' ? 'block' : 'hidden lg:block'}`}>
-                 {/* Desktop Header */}
-                 <div className="hidden lg:flex h-10 border-b border-df-border items-center px-4 bg-df-black shrink-0">
-                    <span className="text-xs font-bold text-df-white tracking-wider">FEEDBACK</span>
-                 </div>
-                 <div className="h-full lg:h-[calc(100%-40px)]">
-                    <FeedbackPanel />
-                 </div>
-              </div>
-            </div>
-          </div>
-        );
+    // Settings panel — only mounted when active
+    if (activeActivity === 'settings') {
+      return (
+        <SettingsPanel 
+          toneContext={toneContext} 
+          setToneContext={setToneContext}
+          onNavigateToOnboarding={handleNavigateToOnboarding}
+          onOpenInputChannels={() => setView('setup')}
+          onOpenTopUp={() => { setTopUpReason(undefined); setShowTopUp(true); }}
+        />
+      );
     }
+
+    // Devflow — disconnected state
+    if (!isIdeConnected) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-df-black animate-in fade-in duration-300">
+          <h2 className="text-df-white font-bold text-sm mb-2 uppercase tracking-tighter">DISCONNECTED</h2>
+          <p className="text-df-gray text-[10px] leading-relaxed mb-8 max-w-xs mx-auto">
+            BRICK needs to be initialized.
+          </p>
+          <button 
+            onClick={() => { setView('setup'); }}
+            className="w-full max-w-xs py-3 bg-df-orange text-df-black font-bold text-xs hover:bg-white transition-colors uppercase border border-df-orange"
+          >
+            Establish Link
+          </button>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -501,6 +451,52 @@ const App: React.FC = () => {
          {/* Central Panel Container */}
          <div className="w-full max-w-2xl lg:max-w-7xl h-full flex flex-col bg-df-black border-x border-[#333] shadow-2xl relative z-10 transition-all duration-300">
             {renderContent()}
+
+            {/* DraftsPanel + FeedbackPanel: always mounted when connected, hidden when on settings */}
+            {isIdeConnected && (
+              <div className={`flex flex-col h-full ${activeActivity !== 'devflow' ? 'hidden' : ''}`}>
+                {/* Mobile/Tablet Tabs */}
+                <div className={`flex border-b border-df-border bg-df-black shrink-0 lg:hidden pt-[env(safe-area-inset-top,44px)] lg:pt-0 min-h-[48px]`}>
+                  <button 
+                    onClick={() => setActiveTab('drafts')}
+                    className={`flex-1 text-xs font-bold tracking-wider hover:bg-[#111] transition-colors flex items-center justify-center ${activeTab === 'drafts' ? 'text-df-white border-b-4 border-df-orange py-2' : 'text-df-gray py-2 border-b-4 border-transparent'}`}
+                  >
+                    DRAFTS
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('feedback')}
+                    className={`flex-1 text-xs font-bold tracking-wider hover:bg-[#111] transition-colors flex items-center justify-center ${activeTab === 'feedback' ? 'text-df-white border-b-4 border-df-orange py-2' : 'text-df-gray py-2 border-b-4 border-transparent'}`}
+                  >
+                    FEEDBACK
+                  </button>
+                </div>
+
+                <div className="flex-grow overflow-hidden relative flex flex-col lg:flex-row">
+                  <div className={`flex-grow h-full lg:w-1/2 lg:border-r border-df-border ${activeTab === 'drafts' ? 'block' : 'hidden lg:block'}`}>
+                    <div className="hidden lg:flex h-10 border-b border-df-border items-center px-4 bg-df-black shrink-0">
+                      <span className="text-xs font-bold text-df-white tracking-wider">DRAFTS</span>
+                    </div>
+                    <div className="h-full lg:h-[calc(100%-40px)]">
+                      <DraftsPanel 
+                        activePlatform={activePlatform} 
+                        setActivePlatform={setActivePlatform} 
+                        triggerEvent={triggerEvent}
+                        toneContext={toneContext}
+                      />
+                    </div>
+                  </div>
+
+                  <div className={`flex-grow h-full lg:w-1/2 ${activeTab === 'feedback' ? 'block' : 'hidden lg:block'}`}>
+                    <div className="hidden lg:flex h-10 border-b border-df-border items-center px-4 bg-df-black shrink-0">
+                      <span className="text-xs font-bold text-df-white tracking-wider">FEEDBACK</span>
+                    </div>
+                    <div className="h-full lg:h-[calc(100%-40px)]">
+                      <FeedbackPanel />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
          </div>
       </div>
     </div>
