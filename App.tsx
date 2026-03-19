@@ -9,7 +9,7 @@ import InputChannelsSetup from './components/InputChannelsSetupModal';
 import { Platform, InputEvent } from './types';
 import { handleOAuthCallback } from './services/oauthService';
 import { ConnectionProvider } from './contexts/ConnectionContext';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
 import { isElectron, isNativePlatform } from './utils/platform';
 import { onMcpProgress, isMcpAvailable } from './services/mcpServerService';
 import { onGitCommit, isGitAvailable, getGitCommitLog } from './services/gitWatcherService';
@@ -399,7 +399,6 @@ const App: React.FC = () => {
   }
 
   return (
-    <AuthProvider>
     <ConnectionProvider>
       {view === 'onboarding' ? (
         <div className="h-screen w-screen bg-black font-mono overflow-hidden">
@@ -541,7 +540,6 @@ const App: React.FC = () => {
         </Suspense>
       )}
     </ConnectionProvider>
-    </AuthProvider>
   );
 };
 
