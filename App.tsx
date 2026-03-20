@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Activity, Settings, ShieldCheck, Square } from 'lucide-react';
 import DraftsPanel from './components/DraftsPanel';
 import FeedbackPanel from './components/FeedbackPanel';
@@ -9,10 +9,15 @@ import InputChannelsSetup from './components/InputChannelsSetupModal';
 import { Platform, InputEvent } from './types';
 import { handleOAuthCallback } from './services/oauthService';
 import { ConnectionProvider } from './contexts/ConnectionContext';
+import { useAuth } from './contexts/AuthContext';
 import { isElectron, isNativePlatform } from './utils/platform';
 import { onMcpProgress, isMcpAvailable } from './services/mcpServerService';
-import { onGitCommit, isGitAvailable } from './services/gitWatcherService';
+import { onGitCommit, isGitAvailable, getGitCommitLog } from './services/gitWatcherService';
 import { onFileChange, isWatcherAvailable } from './services/fileWatcherService';
+import { subscribeToCredits } from './services/creditService';
+import { isFirebaseConfigured } from './services/firebaseConfig';
+
+const CreditTopUpModal = lazy(() => import('./components/CreditTopUpModal'));
 
 export type ActivityTab = 'devflow' | 'settings';
 
@@ -27,20 +32,43 @@ const App: React.FC = () => {
   const [activePlatform, setActivePlatform] = useState<Platform>(Platform.X);
   // Input channel events → triggers draft generation in DraftsPanel
   const [triggerEvent, setTriggerEvent] = useState<InputEvent | null>(null);
-  const [isIdeConnected, setIsIdeConnected] = useState(false);
+  const [isIdeConnected, setIsIdeConnected] = useState(() => {
+    return localStorage.getItem('ide_connected') === 'true';
+  });
   
   // State for AI Voice Calibration
   const [toneContext, setToneContext] = useState<string>('');
   
-  // State for Credits
-  const [credits] = useState(85);
+  // Credits: real-time from Firestore when authenticated, 0 otherwise
+  const { user, isAuthenticated } = useAuth();
+  const [credits, setCredits] = useState(0);
+  const [showTopUp, setShowTopUp] = useState(false);
+  const [topUpReason, setTopUpReason] = useState<string | undefined>();
+
+  // Only subscribe to credits when Firebase is configured AND user is signed in
+  useEffect(() => {
+    if (!isFirebaseConfigured() || !isAuthenticated || !user) {
+      setCredits(0);
+      return;
+    }
+    return subscribeToCredits(user.uid, (c) => setCredits(c));
+  }, [isAuthenticated, user]);
 
   // ── Input Channel Listeners ──────────────────────────────────────────────
+  // Helper: when any input event arrives, also mark IDE as connected
+  const handleInputEvent = (event: InputEvent) => {
+    setTriggerEvent(event);
+    if (!isIdeConnected) {
+      setIsIdeConnected(true);
+      localStorage.setItem('ide_connected', 'true');
+    }
+  };
+
   // MCP: coding agent sends log_progress
   useEffect(() => {
     if (!isMcpAvailable()) return;
     return onMcpProgress((event) => {
-      setTriggerEvent({
+      handleInputEvent({
         source: 'mcp',
         context: event.summary,
         timestamp: Date.now(),
@@ -48,11 +76,26 @@ const App: React.FC = () => {
     });
   }, []);
 
-  // Git: new commit detected
+  // Git: new commit detected — also replay the latest missed commit on mount
   useEffect(() => {
     if (!isGitAvailable()) return;
+
+    // Replay: check if commits were detected before this listener was ready
+    getGitCommitLog().then((log) => {
+      if (log.length > 0) {
+        const latest = log[log.length - 1];
+        handleInputEvent({
+          source: 'git',
+          context: `Commit on ${latest.branch}: ${latest.commit.message}`,
+          codeSnippet: latest.diff,
+          timestamp: Date.now(),
+        });
+      }
+    }).catch(() => {});
+
+    // Listen for future commits
     return onGitCommit((event) => {
-      setTriggerEvent({
+      handleInputEvent({
         source: 'git',
         context: `Commit on ${event.branch}: ${event.commit.message}`,
         codeSnippet: event.diff,
@@ -66,17 +109,35 @@ const App: React.FC = () => {
     if (!isWatcherAvailable()) return;
     return onFileChange((event) => {
       const fileList = event.files
-        .filter(f => !f.sensitive)
+        .filter((f: any) => !f.sensitive)
         .slice(0, 10)
-        .map(f => f.path)
+        .map((f: any) => f.path)
         .join('\n');
-      setTriggerEvent({
+      handleInputEvent({
         source: 'watcher',
         context: event.summary,
         codeSnippet: fileList || undefined,
         timestamp: Date.now(),
       });
     });
+  }, []);
+
+  // Auto-open top-up modal when a credit gate rejects an action
+  // Only listen when paid channels are actually connected
+  useEffect(() => {
+    const hasPaidChannel =
+      !!localStorage.getItem('oauth_tokens_x') ||
+      !!localStorage.getItem('oauth_tokens_reddit') ||
+      !!localStorage.getItem('oauth_tokens_discord');
+    if (!hasPaidChannel) return;
+
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setTopUpReason(detail?.reason || 'You need credits to complete this action.');
+      setShowTopUp(true);
+    };
+    window.addEventListener('brick:credits-needed', handler);
+    return () => window.removeEventListener('brick:credits-needed', handler);
   }, []);
 
   // Handle OAuth callbacks
@@ -123,6 +184,7 @@ const App: React.FC = () => {
             const code = urlObj.searchParams.get('code');
             const state = urlObj.searchParams.get('state');
 
+            
             if (code && state) {
               const stateKey = `oauth_state_${state}`;
               const hasLocalState = localStorage.getItem(stateKey);
@@ -272,88 +334,69 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    switch (activeActivity) {
-      case 'settings':
-        return (
-          <SettingsPanel 
-            toneContext={toneContext} 
-            setToneContext={setToneContext}
-            onNavigateToOnboarding={handleNavigateToOnboarding}
-            onOpenInputChannels={() => setView('setup')}
-          />
-        );
-        
-      case 'devflow':
-      default:
-        if (!isIdeConnected) {
-          return (
-            <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-df-black animate-in fade-in duration-300">
-              <h2 className="text-df-white font-bold text-sm mb-2 uppercase tracking-tighter">DISCONNECTED</h2>
-              <p className="text-df-gray text-[10px] leading-relaxed mb-8 max-w-xs mx-auto">
-                BRICK needs to be initialized.
-              </p>
-              <button 
-                onClick={() => {
-                  setView('setup');
-                }}
-                className="w-full max-w-xs py-3 bg-df-orange text-df-black font-bold text-xs hover:bg-white transition-colors uppercase border border-df-orange"
-              >
-                Establish Link
-              </button>
-            </div>
-          );
-        }
-        return (
-          <div className="flex flex-col h-full animate-in fade-in duration-200">
-            {/* Mobile/Tablet Tabs - Hidden on Desktop */}
-            <div className={`flex border-b border-df-border bg-df-black shrink-0 lg:hidden ${isIdeConnected ? 'pt-[env(safe-area-inset-top,44px)] lg:pt-0 min-h-[48px]' : 'h-12'}`}>
-              <button 
-                onClick={() => setActiveTab('drafts')}
-                className={`flex-1 text-xs font-bold tracking-wider hover:bg-[#111] transition-colors flex items-center justify-center ${activeTab === 'drafts' ? 'text-df-white border-b-4 border-df-orange py-2' : 'text-df-gray py-2 border-b-4 border-transparent'}`}
-              >
-                DRAFTS
-              </button>
-              <button 
-                onClick={() => setActiveTab('feedback')}
-                className={`flex-1 text-xs font-bold tracking-wider hover:bg-[#111] transition-colors flex items-center justify-center ${activeTab === 'feedback' ? 'text-df-white border-b-4 border-df-orange py-2' : 'text-df-gray py-2 border-b-4 border-transparent'}`}
-              >
-                FEEDBACK
-              </button>
-            </div>
-
-            {/* Content Area - Responsive Grid */}
-            <div className="flex-grow overflow-hidden relative flex flex-col lg:flex-row">
-              {/* Left Column (Drafts) */}
-              <div className={`flex-grow h-full lg:w-1/2 lg:border-r border-df-border ${activeTab === 'drafts' ? 'block' : 'hidden lg:block'}`}>
-                 {/* Desktop Header */}
-                 <div className="hidden lg:flex h-10 border-b border-df-border items-center px-4 bg-df-black shrink-0">
-                    <span className="text-xs font-bold text-df-white tracking-wider">DRAFTS</span>
-                 </div>
-                 <div className="h-full lg:h-[calc(100%-40px)]">
-                    <DraftsPanel 
-                      activePlatform={activePlatform} 
-                      setActivePlatform={setActivePlatform} 
-                      triggerEvent={triggerEvent}
-                      toneContext={toneContext}
-                    />
-                 </div>
-              </div>
-
-              {/* Right Column (Feedback) */}
-              <div className={`flex-grow h-full lg:w-1/2 ${activeTab === 'feedback' ? 'block' : 'hidden lg:block'}`}>
-                 {/* Desktop Header */}
-                 <div className="hidden lg:flex h-10 border-b border-df-border items-center px-4 bg-df-black shrink-0">
-                    <span className="text-xs font-bold text-df-white tracking-wider">FEEDBACK</span>
-                 </div>
-                 <div className="h-full lg:h-[calc(100%-40px)]">
-                    <FeedbackPanel />
-                 </div>
-              </div>
-            </div>
-          </div>
-        );
+    // Settings panel — only mounted when active
+    if (activeActivity === 'settings') {
+      return (
+        <SettingsPanel 
+          toneContext={toneContext} 
+          setToneContext={setToneContext}
+          onNavigateToOnboarding={handleNavigateToOnboarding}
+          onOpenInputChannels={() => setView('setup')}
+          onOpenTopUp={() => { setTopUpReason(undefined); setShowTopUp(true); }}
+        />
+      );
     }
+
+    // Devflow — disconnected state
+    if (!isIdeConnected) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-df-black animate-in fade-in duration-300">
+          <h2 className="text-df-white font-bold text-sm mb-2 uppercase tracking-tighter">DISCONNECTED</h2>
+          <p className="text-df-gray text-[10px] leading-relaxed mb-8 max-w-xs mx-auto">
+            BRICK needs to be initialized.
+          </p>
+          <button 
+            onClick={() => { setView('setup'); }}
+            className="w-full max-w-xs py-3 bg-df-orange text-df-black font-bold text-xs hover:bg-white transition-colors uppercase border border-df-orange"
+          >
+            Establish Link
+          </button>
+        </div>
+      );
+    }
+
+    return null;
   };
+
+  // Payment success/cancel — Stripe redirects here after checkout
+  const path = window.location.pathname;
+  if (path === '/payment-success') {
+    return (
+      <div className="h-screen w-screen bg-black font-mono flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-16 h-16 bg-df-orange/20 border-2 border-df-orange flex items-center justify-center mb-6 text-df-orange text-3xl">✓</div>
+        <h1 className="text-df-white font-bold text-xl mb-2 uppercase tracking-wider">Payment successful</h1>
+        <p className="text-df-gray text-sm mb-8 max-w-sm">
+          Your credits have been added. You can close this tab and return to BRICK.
+        </p>
+        <a href="/" className="px-6 py-3 bg-df-orange text-black font-bold text-xs uppercase hover:bg-white transition-colors">
+          Return to BRICK
+        </a>
+      </div>
+    );
+  }
+  if (path === '/payment-cancelled') {
+    return (
+      <div className="h-screen w-screen bg-black font-mono flex flex-col items-center justify-center p-8 text-center">
+        <h1 className="text-df-white font-bold text-xl mb-2 uppercase tracking-wider">Payment cancelled</h1>
+        <p className="text-df-gray text-sm mb-8 max-w-sm">
+          Your payment was not completed. You can close this tab and try again.
+        </p>
+        <a href="/" className="px-6 py-3 bg-df-orange text-black font-bold text-xs uppercase hover:bg-white transition-colors">
+          Return to BRICK
+        </a>
+      </div>
+    );
+  }
 
   return (
     <ConnectionProvider>
@@ -369,6 +412,7 @@ const App: React.FC = () => {
           onClose={() => setView('main')}
           onComplete={() => {
             setIsIdeConnected(true);
+            localStorage.setItem('ide_connected', 'true');
             setView('main');
           }}
         />
@@ -388,12 +432,19 @@ const App: React.FC = () => {
           </div>
         </button>
 
-        {/* Vertical Credit Meter - Wider (w-8) within the w-12 sidebar */}
-        <div className="flex-grow w-full flex flex-col items-center justify-center py-4 px-2 group cursor-help">
-          <div className="w-8 h-full bg-black border border-df-border relative overflow-hidden flex flex-col justify-end shadow-inner">
+        {/* Vertical Credit Meter - click opens top-up modal or settings */}
+        <div 
+          onClick={() => {
+            setTopUpReason(undefined);
+            setShowTopUp(true);
+          }}
+          title={`${credits} CR — click to top up`}
+          className="flex-grow w-full flex flex-col items-center justify-center py-4 px-2 group cursor-pointer"
+        >
+          <div className="w-8 h-full bg-black border border-df-border relative overflow-hidden flex flex-col justify-end shadow-inner group-hover:border-df-orange transition-colors">
             <div 
               className="bg-df-orange w-full transition-all duration-1000 ease-in-out" 
-              style={{ height: `${credits}%` }}
+              style={{ height: `${Math.min((credits / 200) * 100, 100)}%` }}
             ></div>
             {/* Meter Grid Overlay: 16 lines = 15 gaps/squares */}
             <div className="absolute inset-0 flex flex-col justify-between py-0 opacity-25 pointer-events-none">
@@ -429,9 +480,64 @@ const App: React.FC = () => {
          {/* Central Panel Container */}
          <div className="w-full max-w-2xl lg:max-w-7xl h-full flex flex-col bg-df-black border-x border-[#333] shadow-2xl relative z-10 transition-all duration-300">
             {renderContent()}
+
+            {/* DraftsPanel + FeedbackPanel: always mounted when connected, hidden when on settings */}
+            {isIdeConnected && (
+              <div className={`flex flex-col h-full ${activeActivity !== 'devflow' ? 'hidden' : ''}`}>
+                {/* Mobile/Tablet Tabs */}
+                <div className={`flex border-b border-df-border bg-df-black shrink-0 lg:hidden pt-[env(safe-area-inset-top,44px)] lg:pt-0 min-h-[48px]`}>
+                  <button 
+                    onClick={() => setActiveTab('drafts')}
+                    className={`flex-1 text-xs font-bold tracking-wider hover:bg-[#111] transition-colors flex items-center justify-center ${activeTab === 'drafts' ? 'text-df-white border-b-4 border-df-orange py-2' : 'text-df-gray py-2 border-b-4 border-transparent'}`}
+                  >
+                    DRAFTS
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('feedback')}
+                    className={`flex-1 text-xs font-bold tracking-wider hover:bg-[#111] transition-colors flex items-center justify-center ${activeTab === 'feedback' ? 'text-df-white border-b-4 border-df-orange py-2' : 'text-df-gray py-2 border-b-4 border-transparent'}`}
+                  >
+                    FEEDBACK
+                  </button>
+                </div>
+
+                <div className="flex-grow overflow-hidden relative flex flex-col lg:flex-row">
+                  <div className={`flex-grow h-full lg:w-1/2 lg:border-r border-df-border ${activeTab === 'drafts' ? 'block' : 'hidden lg:block'}`}>
+                    <div className="hidden lg:flex h-10 border-b border-df-border items-center px-4 bg-df-black shrink-0">
+                      <span className="text-xs font-bold text-df-white tracking-wider">DRAFTS</span>
+                    </div>
+                    <div className="h-full lg:h-[calc(100%-40px)]">
+                      <DraftsPanel 
+                        activePlatform={activePlatform} 
+                        setActivePlatform={setActivePlatform} 
+                        triggerEvent={triggerEvent}
+                        toneContext={toneContext}
+                      />
+                    </div>
+                  </div>
+
+                  <div className={`flex-grow h-full lg:w-1/2 ${activeTab === 'feedback' ? 'block' : 'hidden lg:block'}`}>
+                    <div className="hidden lg:flex h-10 border-b border-df-border items-center px-4 bg-df-black shrink-0">
+                      <span className="text-xs font-bold text-df-white tracking-wider">FEEDBACK</span>
+                    </div>
+                    <div className="h-full lg:h-[calc(100%-40px)]">
+                      <FeedbackPanel />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
          </div>
       </div>
     </div>
+      )}
+      {showTopUp && (
+        <Suspense fallback={null}>
+          <CreditTopUpModal
+            isOpen={showTopUp}
+            onClose={() => setShowTopUp(false)}
+            reason={topUpReason}
+          />
+        </Suspense>
       )}
     </ConnectionProvider>
   );

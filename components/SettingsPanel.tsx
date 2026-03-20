@@ -1,21 +1,109 @@
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Zap, Globe, Cpu, Link, Lock, EyeOff, Mic, Upload, Check, RefreshCw, Layers, Server, GitBranch, Folder, RotateCcw, Eye, EyeOff as EyeOffIcon, Key } from 'lucide-react';
+import { Shield, Zap, Cpu, Link, Mic, Upload, Check, Layers, Server, GitBranch, Folder, RotateCcw, Eye, EyeOff as EyeOffIcon, Key, User, LogOut, LogIn, Coins } from 'lucide-react';
 import { useConnections } from '../contexts/ConnectionContext';
+import { useAuth } from '../contexts/AuthContext';
 import { getMcpStatus, isMcpAvailable, type McpStatus } from '../services/mcpServerService';
 import { getGitStatus, isGitAvailable, type GitStatus } from '../services/gitWatcherService';
 import { getWatcherStatus, isWatcherAvailable, type WatcherStatus } from '../services/fileWatcherService';
 import { getApiKey, setApiKey, hasApiKey } from '../services/geminiService';
 import { fetchRecentTweets, isXConnected } from '../services/xOAuthService';
+import { signInWithGoogle, signInWithEmail, signUpWithEmail, signOut } from '../services/authService';
+import { isFirebaseConfigured } from '../services/firebaseConfig';
+import { subscribeToCredits } from '../services/creditService';
+import { requireCredits } from '../services/creditGate';
+
+// ─── Credit Section Component ────────────────────────────────────────────────
+
+const CreditSection: React.FC<{ onOpenTopUp?: () => void }> = ({ onOpenTopUp }) => {
+  const { user, isAuthenticated } = useAuth();
+  const { connections } = useConnections();
+  const [credits, setCredits] = useState(0);
+
+  const hasPaidChannel = connections.x || connections.reddit || connections.discord;
+  const needsCreditsForAI = !hasApiKey() && isFirebaseConfigured();
+
+  useEffect(() => {
+    if (!isFirebaseConfigured() || !isAuthenticated || !user) {
+      setCredits(0);
+      return;
+    }
+    return subscribeToCredits(user.uid, setCredits);
+  }, [isAuthenticated, user]);
+
+  // Don't show credits section if no paid channels and user has own AI key
+  if (!hasPaidChannel && !needsCreditsForAI) {
+    return null;
+  }
+
+  return (
+    <section>
+      <h3 className="text-[10px] font-bold text-df-orange uppercase mb-4 flex items-center gap-2">
+        <Coins size={12} /> CREDITS
+      </h3>
+
+      <div className="space-y-3">
+        {/* Balance */}
+        <div className="bg-[#111] border border-df-border p-3 flex items-center justify-between">
+          <span className="text-[10px] text-df-gray uppercase">Balance</span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-xl font-black text-df-white">{credits}</span>
+            <span className="text-[10px] font-bold text-df-orange">CR</span>
+          </div>
+        </div>
+
+        {/* What costs credits */}
+        <div className="bg-[#111] border border-df-border border-dashed p-3">
+          <p className="text-[9px] text-df-gray uppercase font-bold mb-2">Costs credits:</p>
+          <div className="space-y-1 text-[9px]">
+            <div className="flex justify-between"><span className="text-df-gray">Post to X / Reddit / Discord</span><span className="text-df-orange font-bold">1 CR</span></div>
+            <div className="flex justify-between"><span className="text-df-gray">Fetch feedback (X / Reddit / Discord)</span><span className="text-df-orange font-bold">1 CR</span></div>
+            <div className="flex justify-between"><span className="text-df-gray">Import X history</span><span className="text-df-orange font-bold">1 CR</span></div>
+            {needsCreditsForAI && (
+              <div className="flex justify-between"><span className="text-df-gray">AI drafts (no own key)</span><span className="text-df-orange font-bold">1 CR</span></div>
+            )}
+          </div>
+          <div className="mt-2 pt-2 border-t border-df-border text-[9px]">
+            <p className="text-green-500 uppercase font-bold mb-1">Free:</p>
+            <span className="text-df-gray">
+              {hasApiKey() ? 'AI drafts (own key) · ' : ''}Email · MCP · Git · File Watcher
+            </span>
+          </div>
+        </div>
+
+        {/* Top up button */}
+        {(hasPaidChannel || needsCreditsForAI) && (
+          <button
+            onClick={onOpenTopUp}
+            className="w-full py-3 border border-df-orange text-[10px] text-df-orange hover:bg-df-orange hover:text-df-black transition-colors uppercase font-bold flex items-center justify-center gap-2"
+          >
+            <Coins size={12} /> Top Up Credits
+          </button>
+        )}
+
+        {!hasPaidChannel && !needsCreditsForAI && (
+          <div className="bg-[#111] border border-df-border p-3">
+            <p className="text-[9px] text-df-gray">
+              Credits are needed when you connect to X, Reddit, or Discord.
+            </p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+// ─── Settings Panel ──────────────────────────────────────────────────────────
 
 interface SettingsPanelProps {
   toneContext: string;
   setToneContext: (s: string) => void;
   onNavigateToOnboarding?: () => void;
   onOpenInputChannels?: () => void;
+  onOpenTopUp?: () => void;
 }
 
-const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneContext, onNavigateToOnboarding, onOpenInputChannels }) => {
+const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneContext, onNavigateToOnboarding, onOpenInputChannels, onOpenTopUp }) => {
   const { connections } = useConnections();
   const [analyzed, setAnalyzed] = useState(false);
   const [protocols, setProtocols] = useState({
@@ -57,6 +145,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneConte
         return;
       }
 
+      // X API call costs credits
+      const creditCheck = await requireCredits('x', 'Import X history');
+      if (!creditCheck.allowed) {
+        alert(creditCheck.error || 'Insufficient credits');
+        return;
+      }
+
       const tweets = await fetchRecentTweets(20);
       if (tweets.length === 0) {
         alert('No tweets found on your account to import.');
@@ -88,8 +183,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneConte
     setProtocols(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  // Clear cache with 3-step confirmation
+  const [clearStep, setClearStep] = useState(0); // 0=idle, 1=first warning, 2=second warning, 3=final confirm
+
   const handleClearCache = () => {
-    // Clear all BRICK-related localStorage items (preserve onboarding state)
+    setClearStep(1);
+  };
+
+  const executeClearCache = () => {
     const keysToKeep = ['onboarding_complete', 'onboarding_step'];
     const allKeys = Object.keys(localStorage);
     for (const key of allKeys) {
@@ -97,9 +198,53 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneConte
         localStorage.removeItem(key);
       }
     }
-    // Clear sessionStorage
     sessionStorage.clear();
-    alert('Local cache cleared. Tokens and saved state have been removed.');
+    setClearStep(0);
+    window.location.reload();
+  };
+
+  // Auth
+  const { user, isAuthenticated } = useAuth();
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const handleEmailAuth = async () => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      if (authMode === 'signup') {
+        await signUpWithEmail(authEmail, authPassword);
+      } else {
+        await signInWithEmail(authEmail, authPassword);
+      }
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Authentication failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Google sign-in failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (err) {
+      console.error('Sign out error:', err);
+    }
   };
 
   const inboundActive = mcpStatus.running || gitStatus.watching || watcherStatus.folders.length > 0;
@@ -111,6 +256,98 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneConte
       </div>
 
       <div className="flex-grow overflow-y-auto p-4 space-y-8">
+
+        {/* ACCOUNT SECTION */}
+        <section>
+          <h3 className="text-[10px] font-bold text-df-orange uppercase mb-4 flex items-center gap-2">
+            <User size={12} /> ACCOUNT
+          </h3>
+          {!isFirebaseConfigured() ? (
+            <div className="bg-[#111] border border-df-border p-3 space-y-2">
+              <p className="text-[9px] text-df-gray">
+                Firebase is not configured. Add your Firebase config to enable user accounts and credit sync across devices.
+              </p>
+              <p className="text-[8px] text-df-gray/60">
+                Without an account, you can still use BRICK locally with your own API key (Settings → AI Engine).
+              </p>
+            </div>
+          ) : isAuthenticated && user ? (
+            <div className="bg-[#111] border border-df-border p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-df-white font-bold">{user.displayName || 'User'}</div>
+                  <div className="text-[9px] text-df-gray">{user.email}</div>
+                </div>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-1 text-[9px] text-df-gray hover:text-red-400 uppercase font-bold transition-colors"
+                >
+                  <LogOut size={10} /> Sign Out
+                </button>
+              </div>
+              <div className="text-[9px] text-df-gray pt-2 border-t border-df-border">
+                Credits sync across all your devices when signed in.
+              </div>
+            </div>
+          ) : (
+            <div className="bg-[#111] border border-df-border p-3 space-y-3">
+              <p className="text-[9px] text-df-gray">
+                Sign in to sync credits across devices and use BRICK AI without your own API key.
+              </p>
+              {authError && (
+                <div className="text-[9px] text-red-400 bg-red-900/20 border border-red-700/30 p-2">
+                  {authError}
+                </div>
+              )}
+              <button
+                onClick={handleGoogleAuth}
+                disabled={authLoading}
+                className="w-full py-2 bg-df-white text-black text-[10px] font-bold uppercase hover:bg-df-orange transition-colors flex items-center justify-center gap-2"
+              >
+                <LogIn size={12} /> Sign in with Google
+              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex-grow h-px bg-df-border" />
+                <span className="text-[8px] text-df-gray uppercase">or</span>
+                <div className="flex-grow h-px bg-df-border" />
+              </div>
+              <div className="space-y-2">
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="Email"
+                  className="w-full bg-black border border-df-border text-xs text-df-white p-2 outline-none focus:border-df-orange transition-colors font-mono"
+                />
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="Password"
+                  className="w-full bg-black border border-df-border text-xs text-df-white p-2 outline-none focus:border-df-orange transition-colors font-mono"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleEmailAuth}
+                    disabled={authLoading || !authEmail || !authPassword}
+                    className="flex-grow py-2 bg-df-white text-black text-[10px] font-bold uppercase hover:bg-df-orange transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {authLoading ? '...' : authMode === 'signup' ? 'SIGN UP' : 'SIGN IN'}
+                  </button>
+                </div>
+                <button
+                  onClick={() => setAuthMode(m => m === 'signin' ? 'signup' : 'signin')}
+                  className="text-[9px] text-df-gray hover:text-df-orange transition-colors"
+                >
+                  {authMode === 'signin' ? 'Need an account? Sign up' : 'Already have an account? Sign in'}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* CREDITS SECTION */}
+        <CreditSection onOpenTopUp={onOpenTopUp} />
 
         {/* INBOUND CHANNELS SECTION */}
         <section>
@@ -430,6 +667,110 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneConte
             <p className="text-[9px] text-df-gray/30 uppercase tracking-[0.2em]">BRICK v1.0.4-alpha</p>
         </div>
       </div>
+
+      {/* Clear Cache Warning Modal (3 steps) */}
+      {clearStep > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 font-mono">
+          <div className="bg-df-black border border-df-border w-full max-w-sm mx-4 shadow-2xl">
+
+            {/* Step indicator */}
+            <div className="h-1 bg-df-border">
+              <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${(clearStep / 3) * 100}%` }} />
+            </div>
+
+            <div className="p-6">
+              {clearStep === 1 && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <h3 className="text-sm font-black text-df-white uppercase">Are you sure?</h3>
+                  <p className="text-xs text-df-gray leading-relaxed">
+                    This will clear all locally stored data including OAuth tokens, API keys, tone calibration, and session history.
+                  </p>
+                  <p className="text-[10px] text-red-400 font-bold uppercase">
+                    You will be disconnected from all platforms.
+                  </p>
+                </div>
+              )}
+
+              {clearStep === 2 && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <h3 className="text-sm font-black text-red-400 uppercase">This cannot be undone</h3>
+                  <p className="text-xs text-df-gray leading-relaxed">
+                    Your OAuth connections (X, Reddit, Discord, Email) will need to be re-established. Your Gemini API key will be removed.
+                  </p>
+                  <p className="text-[10px] text-df-gray">
+                    Cloud-synced credits (if signed in) are safe and won't be affected.
+                  </p>
+                </div>
+              )}
+
+              {clearStep === 3 && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <h3 className="text-sm font-black text-red-500 uppercase">Final confirmation</h3>
+                  <div className="bg-red-900/20 border border-red-700/50 p-3">
+                    <p className="text-xs text-red-400">
+                      Click "CLEAR EVERYTHING" to permanently erase all local data. The app will reload.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Step 1: Continue on RIGHT */}
+            {clearStep === 1 && (
+              <div className="flex border-t border-df-border">
+                <button
+                  onClick={() => setClearStep(0)}
+                  className="w-1/2 py-4 text-df-gray hover:text-white text-[10px] font-bold uppercase border-r border-df-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => setClearStep(2)}
+                  className="w-1/2 py-4 text-red-400 hover:text-red-300 text-[10px] font-bold uppercase"
+                >
+                  Continue (1/3)
+                </button>
+              </div>
+            )}
+
+            {/* Step 2: Continue on LEFT, Cancel on RIGHT */}
+            {clearStep === 2 && (
+              <div className="flex border-t border-df-border">
+                <button
+                  onClick={() => setClearStep(3)}
+                  className="w-1/2 py-4 text-red-400 hover:text-red-300 text-[10px] font-bold uppercase border-r border-df-border"
+                >
+                  Continue (2/3)
+                </button>
+                <button
+                  onClick={() => setClearStep(0)}
+                  className="w-1/2 py-4 text-df-gray hover:text-white text-[10px] font-bold uppercase"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {/* Step 3: Full-width clear button (different from both previous positions) */}
+            {clearStep === 3 && (
+              <div className="border-t border-df-border">
+                <button
+                  onClick={() => setClearStep(0)}
+                  className="w-full py-3 text-df-gray hover:text-white text-[10px] font-bold uppercase border-b border-df-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeClearCache}
+                  className="w-full py-4 bg-red-900 text-red-400 hover:bg-red-800 text-[10px] font-bold uppercase"
+                >
+                  Clear Everything
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
