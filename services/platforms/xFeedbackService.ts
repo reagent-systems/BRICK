@@ -6,11 +6,12 @@
 import { FeedbackItem, Platform } from '../../types';
 import { ensureValidXToken, getXUserProfile, getCachedUserProfile } from '../xOAuthService';
 import { FeedbackFetchOptions } from '../feedbackService';
-import { isNativePlatform } from '../../utils/platform';
+import { isElectron, isNativePlatform } from '../../utils/platform';
+import { getNativeXApiBase, X_API_PROXY_PATH } from '../xApiConfig';
 
-// API URLs - use proxy on web to avoid CORS, direct API on native
+// API URLs: web dev uses Vite proxy; Electron + Capacitor use api.x.com directly
 const getApiUrl = (path: string): string => {
-  const baseUrl = isNativePlatform() ? 'https://api.twitter.com' : '/api/twitter';
+  const baseUrl = isNativePlatform() || isElectron() ? getNativeXApiBase() : X_API_PROXY_PATH;
   return `${baseUrl}${path}`;
 };
 

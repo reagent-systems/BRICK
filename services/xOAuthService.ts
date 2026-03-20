@@ -6,6 +6,7 @@
 import { generateCodeVerifier, generateCodeChallenge, generateState } from '../utils/pkce';
 import { storeOAuthState, getOAuthState, removeOAuthState, storeTokens, getTokens, OAuthTokens } from './tokenStorageService';
 import { isElectron, isNativePlatform } from '../utils/platform';
+import { getNativeXApiBase, X_OAUTH_AUTHORIZE_URL, X_API_PROXY_PATH, X_MEDIA_UPLOAD_PATH } from './xApiConfig';
 
 // Rate limit information interface
 export interface RateLimitInfo {
@@ -19,12 +20,12 @@ let cachedUserProfile: { id: string; username: string; name: string; profile_ima
 let profileCacheExpiry: number = 0;
 const PROFILE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-// X/Twitter OAuth endpoints
-const TWITTER_AUTH_URL = 'https://twitter.com/i/oauth2/authorize';
+// OAuth authorize (browser) — https://docs.x.com/fundamentals/authentication/oauth-2-0/user-access-token
+// API + token — https://api.x.com (pay-per-use; was api.twitter.com)
 
-// API URLs - use proxy on web to avoid CORS, direct API on native
+// API URLs: web dev uses Vite proxy (/api/twitter → api.x.com). Electron + Capacitor call api.x.com directly.
 const getApiUrl = (path: string): string => {
-  const baseUrl = isNativePlatform() ? 'https://api.twitter.com' : '/api/twitter';
+  const baseUrl = isNativePlatform() || isElectron() ? getNativeXApiBase() : X_API_PROXY_PATH;
   return `${baseUrl}${path}`;
 };
 
@@ -85,7 +86,7 @@ export async function initiateXOAuth(): Promise<void> {
     code_challenge_method: 'S256',
   });
 
-  const authUrl = `${TWITTER_AUTH_URL}?${params.toString()}`;
+  const authUrl = `${X_OAUTH_AUTHORIZE_URL}?${params.toString()}`;
 
   // Open browser for OAuth flow based on platform
   if (isElectron()) {
@@ -374,7 +375,7 @@ export async function uploadMedia(file: File | Blob, mediaType: 'image' | 'video
   formData.append('media', file);
   formData.append('media_category', mediaType === 'image' ? 'tweet_image' : 'tweet_video');
 
-  const initResponse = await fetch(getApiUrl('/1.1/media/upload.json'), {
+  const initResponse = await fetch(getApiUrl(X_MEDIA_UPLOAD_PATH), {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -394,7 +395,7 @@ export async function uploadMedia(file: File | Blob, mediaType: 'image' | 'video
     // Poll for processing completion
     const checkStatus = async (): Promise<string> => {
       const statusResponse = await fetch(
-        `${getApiUrl('/1.1/media/upload.json')}?command=STATUS&media_id=${mediaData.media_id_string}`,
+        `${getApiUrl(X_MEDIA_UPLOAD_PATH)}?command=STATUS&media_id=${mediaData.media_id_string}`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,

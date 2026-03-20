@@ -10,8 +10,9 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
         proxy: {
           // Proxy Twitter API requests to avoid CORS issues in development
+          // X pay-per-use API — same paths as legacy api.twitter.com, new host (docs.x.com)
           '/api/twitter': {
-            target: 'https://api.twitter.com',
+            target: 'https://api.x.com',
             changeOrigin: true,
             rewrite: (path) => path.replace(/^\/api\/twitter/, ''),
             secure: true,
