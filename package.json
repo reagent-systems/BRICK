@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "main": "electron/main.cjs",
   "type": "module",
+  "workspaces": [
+    "website"
+  ],
   "author": "BRICK",
   "description": "BRICK Desktop Application",
   "scripts": {
@@ -23,7 +26,10 @@
     "cap:open": "cap open",
     "cap:run": "cap run",
     "cap:ios": "cap open ios",
-    "cap:android": "cap open android"
+    "cap:android": "cap open android",
+    "website:dev": "npm run dev -w website",
+    "website:build": "npm run build -w website",
+    "website:preview": "npm run preview -w website"
   },
   "dependencies": {
     "@capacitor/app": "^8.0.0",
