@@ -9,7 +9,7 @@ export function getReleaseDownloads() {
 	const version =
 		(import.meta.env.PUBLIC_BRICK_RELEASE_VERSION as string | undefined)?.trim() || '0.1.0';
 	const repo =
-		(import.meta.env.PUBLIC_GITHUB_REPO as string | undefined)?.trim() || 'ThyFriendlyFox/BRICK';
+		(import.meta.env.PUBLIC_GITHUB_REPO as string | undefined)?.trim() || 'reagent-systems/BRICK';
 	const parts = repo.split('/');
 	const owner = parts[0] || 'reagent-systems';
 	const repoName = parts[1] || 'BRICK';
