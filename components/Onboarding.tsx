@@ -5,17 +5,14 @@ import { UserConfig } from '../types';
 import { initiateOAuth, revokeConnection } from '../services/oauthService';
 import { useConnections } from '../contexts/ConnectionContext';
 import { getXUserProfile, clearUserProfileCache } from '../services/xOAuthService';
+import xIcon from '../assets/x.png';
+import redditIcon from '../assets/reddit.png';
+import discordIcon from '../assets/discord.png';
+import emailIcon from '../assets/email.png';
 
 interface OnboardingProps {
   onComplete: () => void;
 }
-
-// Local asset paths
-const X_LOGO_PATH = "/assets/x.png";
-const REDDIT_LOGO_PATH = "/assets/reddit.png";
-const DISCORD_LOGO_PATH = "/assets/discord.png";
-const EMAIL_LOGO_PATH = "/assets/email.png";
-
 
 const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const { connections, hasAnyConnection } = useConnections();
@@ -292,10 +289,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   // --- STEP 5: CONNECTIONS ---
   const renderStep5 = () => {
     const platforms = [
-      { id: 'xConnected' as keyof UserConfig, label: 'X', Icon: null, imagePath: X_LOGO_PATH },
-      { id: 'redditConnected' as keyof UserConfig, label: 'REDDIT', Icon: null, imagePath: REDDIT_LOGO_PATH },
-      { id: 'discordConnected' as keyof UserConfig, label: 'DISCORD', Icon: null, imagePath: DISCORD_LOGO_PATH },
-      { id: 'emailConnected' as keyof UserConfig, label: 'EMAIL', Icon: Mail, imagePath: EMAIL_LOGO_PATH },
+      { id: 'xConnected' as keyof UserConfig, label: 'X', Icon: MessageCircle, imageSrc: xIcon },
+      { id: 'redditConnected' as keyof UserConfig, label: 'REDDIT', Icon: Users, imageSrc: redditIcon },
+      { id: 'discordConnected' as keyof UserConfig, label: 'DISCORD', Icon: MessageCircle, imageSrc: discordIcon },
+      { id: 'emailConnected' as keyof UserConfig, label: 'EMAIL', Icon: Mail, imageSrc: emailIcon },
     ];
 
     const isAnyConnected = config.xConnected || config.redditConnected || config.emailConnected || config.discordConnected;
@@ -312,7 +309,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           </div>
 
           <div className="flex flex-row flex-wrap justify-between px-6 w-full max-w-2xl">
-            {platforms.map(({ id, label, Icon, imagePath }) => {
+            {platforms.map(({ id, label, Icon, imageSrc }) => {
               const isConnected = config[id];
               const isConnecting = connecting === id;
               // For X platform, show username if connected
@@ -337,19 +334,15 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         ? 'border-df-orange bg-df-orange/10 shadow-[4px_4px_0px_rgba(255,98,0,0.2)] group-hover:border-red-500 group-hover:bg-red-900/10 group-hover:shadow-none' 
                         : 'border-[#222] bg-[#080808] group-hover:border-df-gray'}
                   `}>
-                    {imagePath ? (
-                      <div 
-                        className={`w-10 h-10 transition-all duration-300 ${isConnected ? 'bg-df-orange' : 'bg-df-gray group-hover:bg-df-white'}`}
-                        style={{
-                          maskImage: `url(${imagePath})`,
-                          maskRepeat: 'no-repeat',
-                          maskPosition: 'center',
-                          maskSize: 'contain',
-                          WebkitMaskImage: `url(${imagePath})`,
-                          WebkitMaskRepeat: 'no-repeat',
-                          WebkitMaskPosition: 'center',
-                          WebkitMaskSize: 'contain',
-                        }}
+                    {imageSrc ? (
+                      <img
+                        src={imageSrc}
+                        alt={`${label} icon`}
+                        className={`w-8 h-8 object-contain transition-all duration-300 ${
+                          isConnected
+                            ? 'opacity-100'
+                            : 'opacity-80 group-hover:opacity-100'
+                        }`}
                       />
                     ) : (
                       Icon && <Icon 
