@@ -8,7 +8,7 @@
 
 	const CONTACT_EMAIL = 'brick@reagent-systems.com';
 	const SITE_URL = 'https://brick.reagent-systems.com';
-	const OG_IMAGE_URL = `${SITE_URL}/og-image.png`;
+	const OG_IMAGE_URL = `${SITE_URL}/og-image.png?v=2`;
 	const PAGE_DESCRIPTION =
 		'BRICK connects MCP, git, folder watching, and social feedback into one production workflow. Desktop & mobile. By Reagent Systems.';
 
@@ -109,13 +109,17 @@
 	<meta property="og:description" content={PAGE_DESCRIPTION} />
 	<meta property="og:url" content={SITE_URL} />
 	<meta property="og:image" content={OG_IMAGE_URL} />
+	<meta property="og:image:secure_url" content={OG_IMAGE_URL} />
 	<meta property="og:image:type" content="image/png" />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content="BRICK app preview image" />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:title" content="BRICK — Download" />
 	<meta name="twitter:description" content={PAGE_DESCRIPTION} />
 	<meta name="twitter:image" content={OG_IMAGE_URL} />
+	<meta name="twitter:image:src" content={OG_IMAGE_URL} />
+	<meta name="twitter:image:alt" content="BRICK app preview image" />
 </svelte:head>
 
 <div id="top" class="page-root">
