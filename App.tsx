@@ -8,6 +8,7 @@ import Onboarding from './components/Onboarding';
 import InputChannelsSetup from './components/InputChannelsSetupModal';
 import { Platform, InputEvent } from './types';
 import { handleOAuthCallback } from './services/oauthService';
+import { handleGoogleOAuthCallback } from './services/authService';
 import { ConnectionProvider } from './contexts/ConnectionContext';
 import { useAuth } from './contexts/AuthContext';
 import { isElectron, isNativePlatform } from './utils/platform';
@@ -234,27 +235,19 @@ const App: React.FC = () => {
 
   const processOAuthCallback = async (url: string) => {
     try {
-      // Handle protocol URLs (brick://, com.reagent-systems.brick://) and HTTP URLs
-      // Extract query parameters manually for protocol URLs
-      let code: string | null = null;
-      let state: string | null = null;
-      let error: string | null = null;
-      
-      if (url.startsWith('brick://') || url.startsWith('com.reagent-systems.brick://')) {
-        // Protocol URL - parse manually
-        const urlParts = url.split('?');
-        if (urlParts.length > 1) {
-          const params = new URLSearchParams(urlParts[1]);
-          code = params.get('code');
-          state = params.get('state');
-          error = params.get('error');
-        }
-      } else {
-        // HTTP URL - use URL constructor
-        const urlObj = new URL(url);
-        code = urlObj.searchParams.get('code');
-        state = urlObj.searchParams.get('state');
-        error = urlObj.searchParams.get('error');
+      const urlObj = new URL(url);
+      const mergedParams = new URLSearchParams(urlObj.search);
+      const hashParams = new URLSearchParams(urlObj.hash.startsWith('#') ? urlObj.hash.slice(1) : urlObj.hash);
+      hashParams.forEach((value, key) => mergedParams.set(key, value));
+
+      const code = mergedParams.get('code');
+      const state = mergedParams.get('state');
+      const error = mergedParams.get('error');
+
+      // Google Electron flow returns access_token/id_token via deep link.
+      if (url.includes('/auth/google/') || url.includes('google/callback')) {
+        await handleGoogleOAuthCallback(url);
+        return;
       }
 
       if (error) {

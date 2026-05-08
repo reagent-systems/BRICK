@@ -51,6 +51,18 @@ const getRedirectUri = (): string => {
   return import.meta.env.VITE_TWITTER_REDIRECT_URI || `${window.location.origin}/auth/twitter/callback`;
 };
 
+async function getResponseDebugText(response: Response): Promise<string> {
+  const statusLine = `status=${response.status} ${response.statusText}`;
+  const authHeader = response.headers.get('www-authenticate');
+  let bodyText = '';
+  try {
+    bodyText = await response.text();
+  } catch {
+    bodyText = '';
+  }
+  return `${statusLine}${authHeader ? `; www-authenticate=${authHeader}` : ''}${bodyText ? `; body=${bodyText}` : ''}`;
+}
+
 /**
  * Initiate X OAuth flow
  * Opens browser for user authorization
@@ -139,6 +151,7 @@ export async function handleXOAuthCallback(code: string, state: string): Promise
     },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
+      client_id: clientId,
       code,
       redirect_uri: redirectUri,
       code_verifier: codeVerifier,
@@ -146,8 +159,8 @@ export async function handleXOAuthCallback(code: string, state: string): Promise
   });
 
   if (!tokenResponse.ok) {
-    const error = await tokenResponse.text();
-    throw new Error(`Token exchange failed: ${error}`);
+    const debug = await getResponseDebugText(tokenResponse);
+    throw new Error(`Token exchange failed: ${debug}`);
   }
 
   const tokenData = await tokenResponse.json();
@@ -197,13 +210,14 @@ export async function refreshXToken(): Promise<OAuthTokens> {
     },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
+      client_id: clientId,
       refresh_token: tokens.refreshToken,
     }),
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Token refresh failed: ${error}`);
+    const debug = await getResponseDebugText(response);
+    throw new Error(`Token refresh failed: ${debug}`);
   }
 
   const tokenData = await response.json();
@@ -284,7 +298,8 @@ export async function getXUserProfile(forceRefresh: boolean = false): Promise<an
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch user profile: ${response.statusText}`);
+    const debug = await getResponseDebugText(response);
+    throw new Error(`Failed to fetch user profile: ${debug}`);
   }
 
   const data = await response.json();

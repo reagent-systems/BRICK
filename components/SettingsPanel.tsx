@@ -12,6 +12,7 @@ import { signInWithGoogle, signInWithEmail, signUpWithEmail, signOut } from '../
 import { isFirebaseConfigured } from '../services/firebaseConfig';
 import { subscribeToCredits } from '../services/creditService';
 import { requireCredits } from '../services/creditGate';
+import { isElectron } from '../utils/platform';
 
 // ─── Credit Section Component ────────────────────────────────────────────────
 
@@ -233,7 +234,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ toneContext, setToneConte
     try {
       await signInWithGoogle();
     } catch (err) {
-      setAuthError(err instanceof Error ? err.message : 'Google sign-in failed');
+      const message = err instanceof Error ? err.message : 'Google sign-in failed';
+      // Electron flow intentionally opens external browser and resolves via deep-link callback.
+      if (!(isElectron() && message.includes('Google sign-in started in browser'))) {
+        setAuthError(message);
+      }
     } finally {
       setAuthLoading(false);
     }

@@ -25,6 +25,8 @@ jobs:
       # Build-time OAuth values injected into Vite bundle (import.meta.env.VITE_*).
       VITE_TWITTER_CLIENT_ID: ${{ secrets.VITE_TWITTER_CLIENT_ID }}
       VITE_TWITTER_CLIENT_SECRET: ${{ secrets.VITE_TWITTER_CLIENT_SECRET }}
+      VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+      VITE_AUTH_BRIDGE_URL: ${{ secrets.VITE_AUTH_BRIDGE_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

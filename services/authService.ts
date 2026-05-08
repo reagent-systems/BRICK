@@ -9,6 +9,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithCredential,
   signInAnonymously as firebaseSignInAnonymously,
   linkWithPopup,
   linkWithCredential,
@@ -22,6 +23,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseFirestore, isFirebaseConfigured } from './firebaseConfig';
+import { isElectron } from '../utils/platform';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -30,6 +32,87 @@ export interface BrickUser {
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
+}
+
+const GOOGLE_OAUTH_STATE_KEY = 'google_oauth_state';
+
+function parseCallbackParams(url: string): URLSearchParams {
+  const urlObj = new URL(url);
+  const combined = new URLSearchParams(urlObj.search);
+  const hashParams = new URLSearchParams(urlObj.hash.startsWith('#') ? urlObj.hash.slice(1) : urlObj.hash);
+  hashParams.forEach((value, key) => combined.set(key, value));
+  return combined;
+}
+
+function getGoogleClientId(): string {
+  return (
+    import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+    import.meta.env.VITE_FIREBASE_GOOGLE_CLIENT_ID ||
+    ''
+  );
+}
+
+function createRandomString(length: number = 32): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  for (let i = 0; i < length; i++) {
+    result += chars[bytes[i] % chars.length];
+  }
+  return result;
+}
+
+export async function startGoogleSignInForElectron(): Promise<void> {
+  const clientId = getGoogleClientId();
+  if (!clientId) {
+    throw new Error('Google OAuth client ID is missing. Set VITE_GOOGLE_CLIENT_ID.');
+  }
+
+  const state = createRandomString(40);
+  localStorage.setItem(GOOGLE_OAUTH_STATE_KEY, state);
+
+  const bridgeBase = (import.meta.env.VITE_AUTH_BRIDGE_URL || 'https://brick.reagent-systems.com').replace(/\/+$/, '');
+  const authUrl = new URL(`${bridgeBase}/auth/google`);
+  authUrl.searchParams.set('client_id', clientId);
+  authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('scope', 'openid email profile');
+  authUrl.searchParams.set('prompt', 'select_account');
+
+  const electronAPI = (window as any).electronAPI;
+  if (!electronAPI?.openExternal) {
+    throw new Error('Electron shell integration is unavailable.');
+  }
+
+  await electronAPI.openExternal(authUrl.toString());
+}
+
+export async function handleGoogleOAuthCallback(url: string): Promise<BrickUser> {
+  const params = parseCallbackParams(url);
+
+  const error = params.get('error');
+  if (error) {
+    throw new Error(`Google OAuth error: ${error}`);
+  }
+
+  const state = params.get('state');
+  const expectedState = localStorage.getItem(GOOGLE_OAUTH_STATE_KEY);
+  localStorage.removeItem(GOOGLE_OAUTH_STATE_KEY);
+  if (!state || !expectedState || state !== expectedState) {
+    throw new Error('Google OAuth state mismatch.');
+  }
+
+  const idToken = params.get('id_token');
+  const accessToken = params.get('access_token');
+  if (!idToken && !accessToken) {
+    throw new Error('Google OAuth callback missing token.');
+  }
+
+  const auth = getFirebaseAuth();
+  const credential = GoogleAuthProvider.credential(idToken, accessToken || undefined);
+  const result = await signInWithCredential(auth, credential);
+  await ensureUserDoc(result.user);
+  return mapUser(result.user);
 }
 
 // ─── Auth Methods ────────────────────────────────────────────────────────────
@@ -55,6 +138,11 @@ export async function signUpWithEmail(email: string, password: string, displayNa
 }
 
 export async function signInWithGoogle(): Promise<BrickUser> {
+  if (isElectron()) {
+    await startGoogleSignInForElectron();
+    throw new Error('Google sign-in started in browser. Finish authentication there.');
+  }
+
   const auth = getFirebaseAuth();
   const provider = new GoogleAuthProvider();
   const result = await signInWithPopup(auth, provider);
