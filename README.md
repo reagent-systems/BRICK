@@ -27,8 +27,8 @@ DevFlow Studio is a developer-first dashboard designed to reduce the friction of
     *(Note: This is a web preview, dependencies are loaded via ESM in `index.html`)*
 
 2.  **Environment Setup**
-    The app uses the Google Gemini API. In a real environment, `process.env.API_KEY` would be injected.
-    *   *Demo Mode*: If no key is found, the app simulates API responses for testing UI flow.
+    The app uses the Google Gemini API.
+    *Demo Mode*: If no key is found, the app simulates API responses for testing UI flow.
 
 3.  **Run Application**
     Launch the development server to view the studio.
@@ -45,14 +45,6 @@ DevFlow Studio is a developer-first dashboard designed to reduce the friction of
 5.  **Feedback**:
     *   Navigate to the **Feedback** tab.
     *   Filter incoming user comments by type (Bug, Question, Positive).
-
-## 🧩 Simulation & Mock Data
-
-This version of DevFlow Studio runs in a browser environment without a backend. 
-See [SIMULATION_DOCUMENTATION.txt](./SIMULATION_DOCUMENTATION.txt) for a detailed list of mocked behaviors, including:
-*   Simulated MCP Connection latency.
-*   Hardcoded social media feedback.
-*   Mocked AI generation when API keys are absent.
 
 ---
 
