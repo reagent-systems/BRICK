@@ -22,6 +22,9 @@ jobs:
       # Used by electron-builder for macOS code signing in CI (optional but recommended).
       CSC_LINK: ${{ secrets.CSC_LINK }}
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      # Build-time OAuth values injected into Vite bundle (import.meta.env.VITE_*).
+      VITE_TWITTER_CLIENT_ID: ${{ secrets.VITE_TWITTER_CLIENT_ID }}
+      VITE_TWITTER_CLIENT_SECRET: ${{ secrets.VITE_TWITTER_CLIENT_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
