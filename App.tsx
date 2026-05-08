@@ -234,13 +234,13 @@ const App: React.FC = () => {
 
   const processOAuthCallback = async (url: string) => {
     try {
-      // Handle protocol URLs (brick://, com.brick.app://) and HTTP URLs
+      // Handle protocol URLs (brick://, com.reagent-systems.brick://) and HTTP URLs
       // Extract query parameters manually for protocol URLs
       let code: string | null = null;
       let state: string | null = null;
       let error: string | null = null;
       
-      if (url.startsWith('brick://') || url.startsWith('com.brick.app://')) {
+      if (url.startsWith('brick://') || url.startsWith('com.reagent-systems.brick://')) {
         // Protocol URL - parse manually
         const urlParts = url.split('?');
         if (urlParts.length > 1) {

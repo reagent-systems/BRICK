@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.brick.app',
+  appId: 'com.reagent-systems.brick',
   appName: 'BRICK',
   webDir: 'dist',
   server: {

@@ -5,6 +5,9 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
+      // Required for Electron `file://` loads; otherwise Vite emits absolute `/assets/...`
+      // URLs which resolve to `file:///assets/...` and fail.
+      base: './',
       server: {
         port: 3000,
         host: '0.0.0.0',

@@ -45,7 +45,7 @@ const getRedirectUri = (): string => {
     return 'brick://auth/twitter/callback';
   } else if (isNativePlatform()) {
     // Capacitor (iOS/Android) uses the app bundle scheme.
-    return 'com.brick.app://auth/twitter/callback';
+    return 'com.reagent-systems.brick://auth/twitter/callback';
   }
   // Web fallback (dev/preview only) — use env or origin
   return import.meta.env.VITE_TWITTER_REDIRECT_URI || `${window.location.origin}/auth/twitter/callback`;
