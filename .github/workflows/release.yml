@@ -18,6 +18,10 @@ permissions:
 jobs:
   publish:
     runs-on: macos-latest
+    env:
+      # Used by electron-builder for macOS code signing in CI (optional but recommended).
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,7 +39,8 @@ jobs:
         run: npm ci
 
       - name: Build desktop app (DMG + zip)
-        run: npm run electron:build:mac
+        # Prevent electron-builder from attempting to publish; we upload via action-gh-release below.
+        run: npm run build && npx electron-builder --mac --publish never
 
       - name: Publish release with assets
         uses: softprops/action-gh-release@v2
