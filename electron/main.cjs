@@ -32,9 +32,7 @@ function createWindow() {
     },
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     frame: true,
-    icon: process.env.NODE_ENV === 'development'
-      ? path.join(__dirname, '../build/icon.png')
-      : path.join(__dirname, '../dist/icon.png'),
+    icon: path.join(__dirname, '../build/icon.png'),
   });
 
   // Load the app
