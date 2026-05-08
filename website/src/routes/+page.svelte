@@ -7,6 +7,10 @@
 	import GitHubCommitCarousel from '$lib/GitHubCommitCarousel.svelte';
 
 	const CONTACT_EMAIL = 'brick@reagent-systems.com';
+	const SITE_URL = 'https://brick.reagent-systems.com';
+	const OG_IMAGE_URL = `${SITE_URL}/og-image.png`;
+	const PAGE_DESCRIPTION =
+		'BRICK connects MCP, git, folder watching, and social feedback into one production workflow. Desktop & mobile. By Reagent Systems.';
 
 	const dl = getReleaseDownloads();
 
@@ -97,10 +101,21 @@
 
 <svelte:head>
 	<title>BRICK — Download</title>
-	<meta
-		name="description"
-		content="BRICK connects MCP, git, folder watching, and social feedback into one production workflow. Desktop & mobile. By Reagent Systems."
-	/>
+	<meta name="description" content={PAGE_DESCRIPTION} />
+	<link rel="canonical" href={SITE_URL} />
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="BRICK" />
+	<meta property="og:title" content="BRICK — Download" />
+	<meta property="og:description" content={PAGE_DESCRIPTION} />
+	<meta property="og:url" content={SITE_URL} />
+	<meta property="og:image" content={OG_IMAGE_URL} />
+	<meta property="og:image:type" content="image/png" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="BRICK — Download" />
+	<meta name="twitter:description" content={PAGE_DESCRIPTION} />
+	<meta name="twitter:image" content={OG_IMAGE_URL} />
 </svelte:head>
 
 <div id="top" class="page-root">
