@@ -68,5 +68,51 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
-          generate_release_notes: true
           files: ${{ matrix.artifact_glob }}
+          body: |
+            # 🧱 BRICK ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+
+            *A brutalist, flow-preserving tool for building in public directly from your IDE.*
+
+            ---
+
+            ## ⬇️ Downloads
+
+            Grab the right file for your platform from the **Assets** section below.
+
+            | Platform                  | File                              |
+            | ------------------------- | --------------------------------- |
+            | 🪟 Windows — installer     | `BRICK Setup *.exe`               |
+            | 🪟 Windows — portable      | `BRICK-*-win.zip`                 |
+            | 🍎 macOS — Apple Silicon   | `BRICK-*-arm64.dmg`               |
+            | 🍎 macOS — Intel           | `BRICK-*-x64.dmg`                 |
+
+            ---
+
+            ## 🪟 Windows: "Windows protected your PC" warning
+
+            BRICK is **unsigned** (no code-signing certificate yet), so Windows Defender SmartScreen pops up a blue dialog the first time you run it:
+
+            > **Windows protected your PC**
+            > *Microsoft Defender SmartScreen prevented an unrecognized app from starting…*
+
+            This is normal — every indie Electron app gets it without a $300/yr cert. **It is safe to bypass** for a build you got from this repo:
+
+            1. Click **More info** in the dialog
+            2. Click **Run anyway**
+            3. Done — Windows remembers the choice for future runs
+
+            If your browser blocks the download, click the **▾** next to "Discard" → **Keep**.
+
+            ---
+
+            ## 🍎 macOS: "unidentified developer" warning
+
+            If macOS refuses to open BRICK because it's "from an unidentified developer":
+
+            - **Easy:** Right-click the app in Finder → **Open** → confirm, **or**
+            - **Terminal:** `xattr -d com.apple.quarantine /Applications/BRICK.app`
+
+            ---
+
+            **Full changelog:** see commits on [GitHub](https://github.com/reagent-systems/BRICK/commits/${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}).
