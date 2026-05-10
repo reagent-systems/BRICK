@@ -17,9 +17,25 @@ permissions:
 
 jobs:
   publish:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            builder_args: --mac
+            artifact_glob: |
+              release/*.dmg
+              release/*.zip
+          - os: windows-latest
+            platform: win
+            builder_args: --win
+            artifact_glob: |
+              release/*.exe
+              release/*.zip
+    runs-on: ${{ matrix.os }}
     env:
-      # Used by electron-builder for macOS code signing in CI (optional but recommended).
+      # macOS code signing (no-op on Windows / when secrets are unset).
       CSC_LINK: ${{ secrets.CSC_LINK }}
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
       # Build-time OAuth values injected into Vite bundle (import.meta.env.VITE_*).
@@ -43,15 +59,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build desktop app (DMG + zip)
-        # Prevent electron-builder from attempting to publish; we upload via action-gh-release below.
-        run: npm run build && npx electron-builder --mac --publish never
+      - name: Build desktop app
+        # electron-builder reads platform targets from package.json "build" field.
+        # --publish never prevents auto-upload; we hand assets to action-gh-release below.
+        run: npm run build && npx electron-builder ${{ matrix.builder_args }} --publish never
 
       - name: Publish release with assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
           generate_release_notes: true
-          files: |
-            release/*.dmg
-            release/*.zip
+          files: ${{ matrix.artifact_glob }}
